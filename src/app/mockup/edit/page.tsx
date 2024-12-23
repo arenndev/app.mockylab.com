@@ -362,8 +362,8 @@ const EditMockupPage = () => {
         height: 100,
         fill: 'black',
         strokeWidth: 0,
-        originX: 'left',
-        originY: 'top'
+        originX: 'center',
+        originY: 'center'
       }) as DesignRect;
 
       const text = new fabric.Text(areaName, {
@@ -375,10 +375,10 @@ const EditMockupPage = () => {
 
       // Grubu canvas'ın merkezinde oluştur
       const group = new fabric.Group([rect, text], {
-        left: canvas.width! / 2 - 50, // rect width/2
-        top: canvas.height! / 2 - 50,  // rect height/2
-        originX: 'left',
-        originY: 'top',
+        left: canvas.width! / 2,
+        top: canvas.height! / 2,
+        originX: 'center',
+        originY: 'center',
         centeredRotation: true
       });
 
@@ -499,180 +499,224 @@ const EditMockupPage = () => {
 
   return (
     <Layout>
-      {alertState.show && (
-        <Alert 
-          message={alertState.message} 
-          type={alertState.type} 
-        />
-      )}
-      <div className="container mx-auto p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold text-black dark:text-white">
+            Edit Mockup
+          </h2>
+          <nav className="mt-4">
+            <ol className="flex items-center gap-2">
+              <li>
+                <a className="font-medium" href="/mockup">
+                  Mockups
+                </a>
+              </li>
+              <li className="text-primary">/</li>
+              <li className="text-primary">Edit</li>
+            </ol>
+          </nav>
+        </div>
+
+        {alertState.show && (
+          <Alert 
+            message={alertState.message} 
+            type={alertState.type} 
+          />
+        )}
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Canvas Bölümü */}
-          <div className="border p-4 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">Design Canvas</h2>
-            <div className="w-full max-w-[500px] mx-auto space-y-4">
-              <canvas ref={canvasRef} className="border" />
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Design Area Name"
-                  className="flex-1 p-2 border rounded"
-                  id="designAreaName"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (canvas) {
-                      const nameInput = document.getElementById('designAreaName') as HTMLInputElement;
-                      const areaName = nameInput.value.trim();
-                      
-                      if (!areaName) {
+          <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
+              <h3 className="font-medium text-black dark:text-white">
+                Design Canvas
+              </h3>
+            </div>
+            <div className="p-6.5">
+              <div className="w-full max-w-[500px] mx-auto space-y-4">
+                <canvas ref={canvasRef} className="border rounded-sm" />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Design Area Name"
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                    id="designAreaName"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (canvas) {
+                        const nameInput = document.getElementById('designAreaName') as HTMLInputElement;
+                        const areaName = nameInput.value.trim();
+                        
+                        if (!areaName) {
+                          setAlertState({
+                            show: true,
+                            message: 'Please enter a design area name',
+                            type: 'error'
+                          });
+                          
+                          setTimeout(() => {
+                            setAlertState({ show: false, message: '', type: 'error' });
+                          }, 3000);
+                          
+                          return;
+                        }
+                        
+                        createNewDesignArea(areaName);
+                        
+                        nameInput.value = '';
+                        
                         setAlertState({
                           show: true,
-                          message: 'Please enter a design area name',
-                          type: 'error'
+                          message: 'Design area added successfully',
+                          type: 'success'
                         });
                         
                         setTimeout(() => {
-                          setAlertState({ show: false, message: '', type: 'error' });
+                          setAlertState({ show: false, message: '', type: 'success' });
                         }, 3000);
-                        
-                        return;
                       }
-                      
-                      createNewDesignArea(areaName);
-                      
-                      nameInput.value = '';
-                      
-                      setAlertState({
-                        show: true,
-                        message: 'Design area added successfully',
-                        type: 'success'
-                      });
-                      
-                      setTimeout(() => {
-                        setAlertState({ show: false, message: '', type: 'success' });
-                      }, 3000);
-                    }
-                  }}
-                  className="bg-green-500 text-white p-2 rounded hover:bg-green-600"
-                >
-                  Add New Design Area
-                </button>
-              </div>
-              {/* Mevcut design area'ları listele */}
-              <div className="mt-4 space-y-2">
-                {canvas?.getObjects()
-                  .filter(obj => obj instanceof fabric.Rect)
-                  .map((rect, index) => (
-                    <div key={index} className="text-sm text-gray-600">
-                      {(rect as DesignRect).designAreaName || `Design Area ${index + 1}`}
-                    </div>
-                  ))}
+                    }}
+                    className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-center font-medium text-white hover:bg-opacity-90"
+                  >
+                    Add New Design Area
+                  </button>
+                </div>
+                {/* Mevcut design area'ları listele */}
+                <div className="mt-4 space-y-2">
+                  {canvas?.getObjects()
+                    .filter(obj => obj instanceof fabric.Rect)
+                    .map((rect, index) => (
+                      <div key={index} className="text-sm text-gray-600">
+                        {(rect as DesignRect).designAreaName || `Design Area ${index + 1}`}
+                      </div>
+                    ))}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Form Bölümü */}
-          <div className="border p-4 rounded-lg">
-            <h2 className="text-xl font-bold mb-4">Mockup Details</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block mb-2">Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
+          <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
+              <h3 className="font-medium text-black dark:text-white">
+                Mockup Details
+              </h3>
+            </div>
+            <div className="p-6.5">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="mb-2.5 block font-medium text-black dark:text-white">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                  />
+                </div>
 
-              <div>
-                <label className="block mb-2">Category</label>
-                <input
-                  type="text"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
-                  placeholder="Enter category"
-                />
-              </div>
+                <div>
+                  <label className="mb-2.5 block font-medium text-black dark:text-white">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                    placeholder="Enter category"
+                  />
+                </div>
 
-              <div>
-                <label className="block mb-2">T-Shirt Category</label>
-                <select
-                  name="tshirtCategory"
-                  value={formData.tshirtCategory}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
+                <div>
+                  <label className="mb-2.5 block font-medium text-black dark:text-white">
+                    T-Shirt Category
+                  </label>
+                  <select
+                    name="tshirtCategory"
+                    value={formData.tshirtCategory}
+                    onChange={handleInputChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                  >
+                    {Object.values(TshirtCategory).map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2.5 block font-medium text-black dark:text-white">
+                    Size
+                  </label>
+                  <select
+                    name="sizeCategory"
+                    value={formData.sizeCategory}
+                    onChange={handleInputChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                  >
+                    {Object.values(SizeCategory).map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2.5 block font-medium text-black dark:text-white">
+                    Gender
+                  </label>
+                  <select
+                    name="genderCategory"
+                    value={formData.genderCategory}
+                    onChange={handleInputChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                  >
+                    {Object.values(GenderCategory).map(gender => (
+                      <option key={gender} value={gender}>{gender}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2.5 block font-medium text-black dark:text-white">
+                    Design Color
+                  </label>
+                  <select
+                    name="designColor"
+                    value={formData.designColor}
+                    onChange={handleInputChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                  >
+                    {Object.values(DesignColor).map(color => (
+                      <option key={color} value={color}>{color}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2.5 block font-medium text-black dark:text-white">
+                    Upload Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="flex w-full justify-center rounded bg-primary p-3 font-medium text-white hover:bg-opacity-90"
                 >
-                  {Object.values(TshirtCategory).map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2">Size</label>
-                <select
-                  name="sizeCategory"
-                  value={formData.sizeCategory}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
-                >
-                  {Object.values(SizeCategory).map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2">Gender</label>
-                <select
-                  name="genderCategory"
-                  value={formData.genderCategory}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
-                >
-                  {Object.values(GenderCategory).map(gender => (
-                    <option key={gender} value={gender}>{gender}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2">Design Color</label>
-                <select
-                  name="designColor"
-                  value={formData.designColor}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded"
-                >
-                  {Object.values(DesignColor).map(color => (
-                    <option key={color} value={color}>{color}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-2">Upload Image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-              >
-                Save Mockup
-              </button>
-            </form>
+                  Save Mockup
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
