@@ -135,6 +135,8 @@ const EditMockupPage = () => {
     type: 'error'
   });
 
+  const [originalImageSize, setOriginalImageSize] = React.useState<{width: number, height: number} | null>(null);
+
   useEffect(() => {
     if (canvasRef.current) {
       if (canvas) {
@@ -207,8 +209,13 @@ const EditMockupPage = () => {
           const img = new Image();
           img.src = event.target.result as string;
           img.onload = () => {
+            // Orijinal boyutları sakla
+            setOriginalImageSize({
+              width: img.width,
+              height: img.height
+            });
+
             const fabricImage = new fabric.Image(img);
-            
             const scale = Math.min(
               canvas.width! / fabricImage.width!,
               canvas.height! / fabricImage.height!
@@ -244,45 +251,97 @@ const EditMockupPage = () => {
     }
   };
 
-  const addDesignArea = async (mockupId: number, rect: DesignRect) => {
+  const addDesignArea = async (mockupId: number, group: fabric.Group) => {
     try {
+      if (!originalImageSize) {
+        throw new Error('Original image size not available');
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       
+      const rect = group.getObjects().find(obj => obj instanceof fabric.Rect) as fabric.Rect;
+      if (!rect) {
+        throw new Error('Rectangle not found in group');
+      }
+
+      const canvasImage = canvas?.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
+      if (!canvasImage) {
+        throw new Error('Image not found on canvas');
+      }
+
+      // Görsel için ölçek faktörlerini hesapla
+      const imageScaleX = originalImageSize.width / (canvasImage.width! * canvasImage.scaleX!);
+      const imageScaleY = originalImageSize.height / (canvasImage.height! * canvasImage.scaleY!);
+
+      // Group'un gerçek boyutlarını al (transformasyon dahil)
+      const groupBoundingRect = group.getBoundingRect();
+      
+      // Group'un merkez noktasını al
+      const groupCenter = group.getCenterPoint();
+
+      // Merkez noktasının görsele göre göreceli pozisyonunu hesapla
+      const relativeCenterX = groupCenter.x - canvasImage.left!;
+      const relativeCenterY = groupCenter.y - canvasImage.top!;
+
+      // Boyutları ve merkez noktasını orijinal görsel boyutuna ölçekle
+      const scaledWidth = Math.round(groupBoundingRect.width * imageScaleX);
+      const scaledHeight = Math.round(groupBoundingRect.height * imageScaleY);
+      const scaledCenterX = Math.round(relativeCenterX * imageScaleX);
+      const scaledCenterY = Math.round(relativeCenterY * imageScaleY);
+
+      // Sol üst köşe koordinatlarını merkez noktasından hesapla
+      const scaledLeft = Math.round(scaledCenterX - (scaledWidth / 2));
+      const scaledTop = Math.round(scaledCenterY - (scaledHeight / 2));
+
+      const designArea = {
+        name: (rect as DesignRect).designAreaName || `Design Area ${Date.now()}`,
+        left: Math.max(0, scaledLeft),
+        top: Math.max(0, scaledTop),
+        centerX: scaledCenterX,
+        centerY: scaledCenterY,
+        width: scaledWidth,
+        height: scaledHeight,
+        angle: group.angle || 0
+      };
+
+      console.log('Debug Values:', {
+        originalImageSize,
+        canvasImage: {
+          width: canvasImage.width,
+          height: canvasImage.height,
+          scaleX: canvasImage.scaleX,
+          scaleY: canvasImage.scaleY,
+          left: canvasImage.left,
+          top: canvasImage.top
+        },
+        group: {
+          boundingRect: groupBoundingRect,
+          center: groupCenter,
+          angle: group.angle
+        },
+        calculated: {
+          imageScaleX,
+          imageScaleY,
+          scaledWidth,
+          scaledHeight,
+          scaledCenterX,
+          scaledCenterY,
+          scaledLeft,
+          scaledTop
+        }
+      });
+
       const response = await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({
-          name: rect.designAreaName || `Design Area ${Date.now()}`,
-          left: Math.round(rect.left || 0),
-          top: Math.round(rect.top || 0),
-          centerX: Math.round((rect.left || 0) + ((rect.width || 0) * (rect.scaleX || 1)) / 2),
-          centerY: Math.round((rect.top || 0) + ((rect.height || 0) * (rect.scaleY || 1)) / 2),
-          width: Math.round((rect.width || 0) * (rect.scaleX || 1)),
-          height: Math.round((rect.height || 0) * (rect.scaleY || 1)),
-          angle: Math.round(rect.angle || 0)
-        })
+        body: JSON.stringify(designArea)
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Design Area API Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText,
-          sentData: {
-            name: rect.designAreaName || `Design Area ${Date.now()}`,
-            left: Math.round(rect.left || 0),
-            top: Math.round(rect.top || 0),
-            centerX: Math.round((rect.left || 0) + ((rect.width || 0) * (rect.scaleX || 1)) / 2),
-            centerY: Math.round((rect.top || 0) + ((rect.height || 0) * (rect.scaleY || 1)) / 2),
-            width: Math.round((rect.width || 0) * (rect.scaleX || 1)),
-            height: Math.round((rect.height || 0) * (rect.scaleY || 1)),
-            angle: Math.round(rect.angle || 0)
-          }
-        });
         throw new Error(`Failed to add design area: ${response.status} ${response.statusText}`);
       }
 
@@ -292,6 +351,40 @@ const EditMockupPage = () => {
     } catch (error) {
       console.error('Error adding design area:', error);
       throw error;
+    }
+  };
+
+  // Design area oluştururken başlangıç pozisyonunu canvas merkezine ayarla
+  const createNewDesignArea = (areaName: string) => {
+    if (canvas) {
+      const rect = new fabric.Rect({
+        width: 100,
+        height: 100,
+        fill: 'black',
+        strokeWidth: 0,
+        originX: 'left',
+        originY: 'top'
+      }) as DesignRect;
+
+      const text = new fabric.Text(areaName, {
+        fontSize: 14,
+        fill: 'white',
+        originX: 'center',
+        originY: 'center'
+      });
+
+      // Grubu canvas'ın merkezinde oluştur
+      const group = new fabric.Group([rect, text], {
+        left: canvas.width! / 2 - 50, // rect width/2
+        top: canvas.height! / 2 - 50,  // rect height/2
+        originX: 'left',
+        originY: 'top',
+        centeredRotation: true
+      });
+
+      rect.designAreaName = areaName;
+      canvas.add(group);
+      canvas.renderAll();
     }
   };
 
@@ -365,10 +458,7 @@ const EditMockupPage = () => {
             });
 
             for (const group of groups) {
-              const rect = (group as fabric.Group).getObjects().find(obj => obj instanceof fabric.Rect) as DesignRect;
-              if (rect) {
-                await addDesignArea(result.data.id, rect);
-              }
+              await addDesignArea(result.data.id, group as fabric.Group);
             }
 
             setAlertState({
@@ -450,36 +540,7 @@ const EditMockupPage = () => {
                         return;
                       }
                       
-                      const rect = new fabric.Rect({
-                        left: 0,
-                        top: 0,
-                        width: 100,
-                        height: 100,
-                        fill: 'black',
-                        strokeWidth: 0,
-                        originX: 'center',
-                        originY: 'center'
-                      }) as DesignRect;
-                      
-                      const text = new fabric.Text(areaName, {
-                        fontSize: 14,
-                        fill: 'white',
-                        originX: 'center',
-                        originY: 'center'
-                      });
-                      
-                      const group = new fabric.Group([rect, text], {
-                        left: 100,
-                        top: 100,
-                        width: rect.width,
-                        height: rect.height,
-                        originX: 'center',
-                        originY: 'center'
-                      });
-                      
-                      rect.designAreaName = areaName;
-                      canvas.add(group);
-                      canvas.renderAll();
+                      createNewDesignArea(areaName);
                       
                       nameInput.value = '';
                       
