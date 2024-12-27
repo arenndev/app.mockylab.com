@@ -35,7 +35,7 @@ const menuGroups = [
         label: 'Mockups',
         route: '#',
         children: [
-          { label: 'Mockup List', route: '/mockup' },
+          { label: 'Mockup List', route: '/mockup/list' },
           { label: 'Edit Mockup', route: '/mockup/edit' }
         ]
       },
