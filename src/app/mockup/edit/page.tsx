@@ -47,6 +47,15 @@ interface DesignRect extends fabric.Rect {
   designAreaName?: string;
 }
 
+interface MockupDesignArea {
+  width: number;
+  height: number;
+  name: string;
+  centerX: number;
+  centerY: number;
+  angle: number;
+}
+
 const Alert = ({ message, type }: { message: string; type: string }) => {
   let alertStyle = '';
   let iconBg = '';
@@ -392,11 +401,15 @@ const EditMockupPage = () => {
     e.preventDefault();
     
     try {
+      if (!mockupId) {
+        throw new Error('Mockup ID is required');
+      }
+
       // Form validasyonu
-      if (!formData.name || !formData.category || !formData.imageFile) {
+      if (!formData.name || !formData.category) {
         setAlertState({
           show: true,
-          message: 'Please fill in all required fields and upload an image',
+          message: 'Please fill in all required fields',
           type: 'error'
         });
         return;
@@ -409,72 +422,74 @@ const EditMockupPage = () => {
       formDataToSend.append('DesignColor', formData.designColor);
       formDataToSend.append('TshirtCategory', formData.tshirtCategory);
       formDataToSend.append('SizeCategory', formData.sizeCategory);
-      formDataToSend.append('ImageFile', formData.imageFile);
+      
+      // Eğer yeni bir resim yüklendiyse ekle
+      if (formData.imageFile) {
+        formDataToSend.append('ImageFile', formData.imageFile);
+      }
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       
       setAlertState({
         show: true,
-        message: 'Creating mockup...',
+        message: 'Updating mockup...',
         type: 'warning'
       });
 
-      const response = await fetch(`${API_URL}/api/Mockup`, {
-        method: 'POST',
+      const response = await fetch(`${API_URL}/api/Mockup/${mockupId}`, {
+        method: 'PUT',
         body: formDataToSend,
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         const errorData = JSON.parse(errorText);
-        console.error('API Error Details:', {
-          status: response.status,
-          statusText: response.statusText,
-          errors: errorData.errors,
-        });
-        throw new Error(errorData.message || 'Failed to create mockup');
+        throw new Error(errorData.message || 'Failed to update mockup');
       }
 
       const result = await response.json();
-      console.log('Mockup created:', result);
+      console.log('Mockup updated:', result);
 
       setAlertState({
         show: true,
-        message: 'Mockup created successfully!',
+        message: 'Mockup updated successfully!',
         type: 'success'
       });
 
-      // Design Areas ekleme
+      // Design Areas güncelleme
       if (result.data?.id) {
         const groups = canvas?.getObjects().filter(obj => obj instanceof fabric.Group);
         
         if (groups && groups.length > 0) {
-          const shouldAddDesignAreas = window.confirm('Would you like to add design areas to this mockup?');
-          if (shouldAddDesignAreas) {
-            setAlertState({
-              show: true,
-              message: 'Adding design areas...',
-              type: 'warning'
-            });
+          setAlertState({
+            show: true,
+            message: 'Updating design areas...',
+            type: 'warning'
+          });
 
-            for (const group of groups) {
-              await addDesignArea(result.data.id, group as fabric.Group);
-            }
+          // Önce mevcut design area'ları sil
+          await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas`, {
+            method: 'DELETE'
+          });
 
-            setAlertState({
-              show: true,
-              message: 'All design areas added successfully!',
-              type: 'success'
-            });
+          // Yeni design area'ları ekle
+          for (const group of groups) {
+            await addDesignArea(result.data.id, group as fabric.Group);
           }
+
+          setAlertState({
+            show: true,
+            message: 'All design areas updated successfully!',
+            type: 'success'
+          });
         }
       }
 
     } catch (error) {
-      console.error('Error creating mockup:', error);
+      console.error('Error updating mockup:', error);
       setAlertState({
         show: true,
-        message: error instanceof Error ? error.message : 'Failed to create mockup. Please try again.',
+        message: error instanceof Error ? error.message : 'Failed to update mockup. Please try again.',
         type: 'error'
       });
     }
@@ -496,6 +511,112 @@ const EditMockupPage = () => {
       });
     }
   }, [canvas]);
+
+  // Mockup verilerini yüklemek için useEffect
+  useEffect(() => {
+    const fetchMockupData = async () => {
+      if (!mockupId) return;
+
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+        const response = await fetch(`${API_URL}/api/Mockup/${mockupId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch mockup data');
+        }
+
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const mockup = result.data;
+          
+          // Form verilerini güncelle
+          setFormData(prev => ({
+            ...prev,
+            name: mockup.name || '',
+            category: mockup.category || '',
+            tshirtCategory: mockup.tshirtCategory || TshirtCategory.TSHIRT,
+            sizeCategory: mockup.sizeCategory || SizeCategory.ADULT,
+            genderCategory: mockup.genderCategory || GenderCategory.UNISEX,
+            designColor: mockup.designColor || DesignColor.BLACK
+          }));
+
+          // Eğer mockup'ın bir resmi varsa, canvas'a yükle
+          if (mockup.backgroundImagePath) {
+            fabric.Image.fromURL(mockup.backgroundImagePath, {}, (img: fabric.Image) => {
+              if (canvas) {
+                const scale = Math.min(
+                  canvas.width! / img.width!,
+                  canvas.height! / img.height!
+                );
+                
+                img.scale(scale);
+                img.set({
+                  left: (canvas.width! - img.width! * scale) / 2,
+                  top: (canvas.height! - img.height! * scale) / 2,
+                  selectable: false,
+                  evented: false
+                });
+                
+                canvas.clear();
+                canvas.add(img);
+                canvas.renderAll();
+
+                // Orijinal görsel boyutlarını sakla
+                setOriginalImageSize({
+                  width: img.width!,
+                  height: img.height!
+                });
+              }
+            });
+          }
+
+          // Design areas varsa yükle
+          if (mockup.designAreas && mockup.designAreas.length > 0) {
+            mockup.designAreas.forEach((area: MockupDesignArea) => {
+              const rect = new fabric.Rect({
+                width: area.width,
+                height: area.height,
+                fill: 'black',
+                strokeWidth: 0,
+                originX: 'center',
+                originY: 'center'
+              }) as DesignRect;
+
+              const text = new fabric.Text(area.name || 'Design Area', {
+                fontSize: 14,
+                fill: 'white',
+                originX: 'center',
+                originY: 'center'
+              });
+
+              const group = new fabric.Group([rect, text], {
+                left: area.centerX,
+                top: area.centerY,
+                angle: area.angle || 0,
+                originX: 'center',
+                originY: 'center'
+              });
+
+              rect.designAreaName = area.name;
+              canvas?.add(group);
+            });
+
+            canvas?.renderAll();
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching mockup:', error);
+        setAlertState({
+          show: true,
+          message: 'Failed to load mockup data',
+          type: 'error'
+        });
+      }
+    };
+
+    fetchMockupData();
+  }, [mockupId, canvas]);
 
   return (
     <Layout>

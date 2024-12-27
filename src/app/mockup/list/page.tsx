@@ -57,7 +57,7 @@ const MockupList = () => {
   };
 
   const handleEdit = (id: number) => {
-    router.push(`/mockup/edit/${id}`);
+    router.push(`/mockup/edit?mockupId=${id}`);
   };
 
   const handleView = (id: number) => {
