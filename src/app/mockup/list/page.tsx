@@ -20,6 +20,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import Image from 'next/image';
 
 interface MockupData {
   id: number;
@@ -38,6 +39,7 @@ const MockupList = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedMockupId, setSelectedMockupId] = useState<number | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     fetchMockups();
@@ -93,6 +95,18 @@ const MockupList = () => {
     setPreviewImage(null);
   };
 
+  const preloadImage = (imageUrl: string) => {
+    if (!preloadedImages[imageUrl]) {
+      const img = new window.Image();
+      img.src = imageUrl;
+      setPreloadedImages(prev => ({ ...prev, [imageUrl]: true }));
+    }
+  };
+
+  const handleMouseEnter = (imageUrl: string) => {
+    preloadImage(imageUrl);
+  };
+
   return (
     <DefaultLayout>
       <Breadcrumb pageName="Mockup List" />
@@ -120,11 +134,18 @@ const MockupList = () => {
                     className="hover:bg-gray-2 dark:hover:bg-meta-4 dark:border-strokedark"
                   >
                     <TableCell className="dark:text-white">
-                      <img 
-                        src={mockup.backgroundImagePreviewPath} 
-                        alt={mockup.name}
-                        className="w-12.5 h-12.5 rounded-md object-cover"
-                      />
+                      <div className="relative w-12.5 h-12.5">
+                        <Image 
+                          src={mockup.backgroundImagePreviewPath} 
+                          alt={mockup.name}
+                          fill
+                          sizes="(max-width: 50px) 100vw"
+                          className="rounded-md object-cover"
+                          loading="lazy"
+                          placeholder="blur"
+                          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRoaHSQrJyEwSkNOPTYwPTYyRkNUSFZIMS8wTEY3RkVQWUZGUktLe4JzXHJFR0X/2wBDABUXFx4aHh0eHUEgICBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUX/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="dark:text-white">{mockup.name}</TableCell>
                     <TableCell className="dark:text-white">{mockup.category}</TableCell>
@@ -137,6 +158,7 @@ const MockupList = () => {
                         <Tooltip title="Details">
                           <IconButton 
                             onClick={() => handlePreviewOpen(mockup.backgroundImagePreviewPath)}
+                            onMouseEnter={() => handleMouseEnter(mockup.backgroundImagePreviewPath)}
                             className="hover:text-primary dark:text-white dark:hover:text-primary"
                           >
                             <VisibilityIcon />
@@ -226,7 +248,7 @@ const MockupList = () => {
           <div className="relative w-full max-w-180 rounded-lg bg-white p-4 dark:bg-boxdark">
             <button
               onClick={() => setPreviewImage(null)}
-              className="absolute top-2 right-2 text-black hover:text-meta-1 dark:text-white"
+              className="absolute top-2 right-2 text-black hover:text-meta-1 dark:text-white z-10"
             >
               <svg
                 className="fill-current"
@@ -244,12 +266,18 @@ const MockupList = () => {
                 />
               </svg>
             </button>
-            <img
-              src={previewImage}
-              alt="Mockup Preview"
-              className="w-full rounded-lg object-contain"
-              style={{ maxHeight: 'calc(90vh - 2rem)' }}
-            />
+            <div className="relative w-full h-[80vh]">
+              <Image
+                src={previewImage}
+                alt="Mockup Preview"
+                fill
+                sizes="(max-width: 1200px) 100vw"
+                className="rounded-lg object-contain"
+                quality={85}
+                priority={true}
+                loading="eager"
+              />
+            </div>
           </div>
         </div>
       )}

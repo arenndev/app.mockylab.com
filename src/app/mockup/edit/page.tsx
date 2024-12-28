@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import Layout from '@/components/Layouts/DefaultLayout';
 import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+import axios from 'axios';
 
 enum TshirtCategory {
   TSHIRT = 'Tshirt',
@@ -146,6 +148,31 @@ const EditMockupPage = () => {
 
   const [originalImageSize, setOriginalImageSize] = React.useState<{width: number, height: number} | null>(null);
 
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [mockupData, setMockupData] = useState<any>(null);
+
+  const fetchMockupData = useCallback(async (mockupId: string) => {
+    setIsLoading(true);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+      const response = await axios.get(`${API_URL}/api/Mockup/${mockupId}`);
+      
+      if (response.data.success) {
+        setMockupData(response.data.data);
+        // Görsel önbelleğe alma
+        if (response.data.data.backgroundImagePreviewPath) {
+          const img = new window.Image();
+          img.src = response.data.data.backgroundImagePreviewPath;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching mockup:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (canvasRef.current) {
       if (canvas) {
@@ -215,7 +242,7 @@ const EditMockupPage = () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result && canvas) {
-          const img = new Image();
+          const img = new window.Image();
           img.src = event.target.result as string;
           img.onload = () => {
             // Orijinal boyutları sakla
@@ -543,7 +570,7 @@ const EditMockupPage = () => {
           if (canvas && mockup.backgroundImagePath) {
             canvas.clear();
             
-            const img = new Image();
+            const img = new window.Image();
             img.onload = () => {
               const fabricImage = new fabric.Image(img);
               const scale = Math.min(
