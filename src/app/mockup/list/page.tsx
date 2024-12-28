@@ -1,8 +1,8 @@
-'use client';
+"use client";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Table,
@@ -21,6 +21,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import Image from 'next/image';
+import { authService } from "@/services/authService";
 
 interface MockupData {
   id: number;
@@ -55,6 +56,13 @@ const MockupList = () => {
 
   const fetchMockups = async () => {
     try {
+      const token = authService.getToken();
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const response = await axios.get(`${API_URL}/api/Mockup`);
       
