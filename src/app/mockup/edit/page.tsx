@@ -543,19 +543,27 @@ const EditMockupPage = () => {
   useEffect(() => {
     const fetchMockupData = async () => {
       if (!mockupId) return;
+      setIsLoading(true);
 
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+        const mockupResponse = await fetch(`${API_URL}/api/Mockup/${mockupId}`, {
+          cache: 'force-cache', // SSR için önbelleğe alma
+          next: { revalidate: 3600 } // Her saat başı yenileme
+        });
         
-        // 1. Önce mockup verilerini al
-        const mockupResponse = await fetch(`${API_URL}/api/Mockup/${mockupId}`);
         if (!mockupResponse.ok) throw new Error('Failed to fetch mockup data');
         const mockupResult = await mockupResponse.json();
 
         if (mockupResult.success && mockupResult.data) {
           const mockup = mockupResult.data;
           
-          // Form verilerini güncelle
+          // Görsel yüklemesini önceden başlat
+          if (mockup.backgroundImagePath) {
+            const preloadImage = new window.Image();
+            preloadImage.src = mockup.backgroundImagePath;
+          }
+
           setFormData(prev => ({
             ...prev,
             name: mockup.name || '',
@@ -609,6 +617,8 @@ const EditMockupPage = () => {
           message: 'Failed to load mockup data',
           type: 'error'
         });
+      } finally {
+        setIsLoading(false);
       }
     };
 
