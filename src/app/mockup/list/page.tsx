@@ -35,6 +35,14 @@ interface MockupData {
 
 const MockupList = () => {
   const [mockups, setMockups] = useState<MockupData[]>([]);
+  const [filteredMockups, setFilteredMockups] = useState<MockupData[]>([]);
+  const [filters, setFilters] = useState({
+    name: '',
+    category: '',
+    genderCategory: '',
+    sizeCategory: '',
+    tshirtCategory: ''
+  });
   const router = useRouter();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedMockupId, setSelectedMockupId] = useState<number | null>(null);
@@ -56,6 +64,29 @@ const MockupList = () => {
     } catch (error) {
       console.error('Error fetching mockups:', error);
     }
+  };
+
+  useEffect(() => {
+    const filtered = mockups.filter(mockup => {
+      return (
+        mockup.name.toLowerCase().includes(filters.name.toLowerCase()) &&
+        (filters.category === '' || mockup.category === filters.category) &&
+        (filters.genderCategory === '' || mockup.genderCategory === filters.genderCategory) &&
+        (filters.sizeCategory === '' || mockup.sizeCategory === filters.sizeCategory) &&
+        (filters.tshirtCategory === '' || mockup.tshirtCategory === filters.tshirtCategory)
+      );
+    });
+    setFilteredMockups(filtered);
+  }, [mockups, filters]);
+
+  useEffect(() => {
+    if (mockups.length > 0) {
+      setFilteredMockups(mockups);
+    }
+  }, [mockups]);
+
+  const handleFilterChange = (name: string, value: string) => {
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   const handleEdit = (id: number) => {
@@ -112,82 +143,116 @@ const MockupList = () => {
       <Breadcrumb pageName="Mockup List" />
 
       <div className="flex flex-col gap-10">
-        <Card className="rounded-sm border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
-          <div className="max-w-full overflow-x-auto">
-            <Table className="dark:text-white">
-              <TableHead>
-                <TableRow className="dark:border-strokedark">
-                  <TableCell className="dark:text-white">Preview</TableCell>
-                  <TableCell className="dark:text-white">Name</TableCell>
-                  <TableCell className="dark:text-white">Category</TableCell>
-                  <TableCell className="dark:text-white">Gender</TableCell>
-                  <TableCell className="dark:text-white">Color</TableCell>
-                  <TableCell className="dark:text-white">Size</TableCell>
-                  <TableCell className="dark:text-white">Type</TableCell>
-                  <TableCell align="right" className="dark:text-white">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {mockups.map((mockup) => (
-                  <TableRow 
-                    key={mockup.id}
-                    className="hover:bg-gray-2 dark:hover:bg-meta-4 dark:border-strokedark"
-                  >
-                    <TableCell className="dark:text-white">
-                      <div className="relative w-12.5 h-12.5">
-                        <Image 
-                          src={mockup.backgroundImagePreviewPath} 
-                          alt={mockup.name}
-                          fill
-                          sizes="(max-width: 50px) 100vw"
-                          className="rounded-md object-cover"
-                          loading="lazy"
-                          placeholder="blur"
-                          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRoaHSQrJyEwSkNOPTYwPTYyRkNUSFZIMS8wTEY3RkVQWUZGUktLe4JzXHJFR0X/2wBDABUXFx4aHh0eHUEgICBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUX/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="dark:text-white">{mockup.name}</TableCell>
-                    <TableCell className="dark:text-white">{mockup.category}</TableCell>
-                    <TableCell className="dark:text-white">{mockup.genderCategory}</TableCell>
-                    <TableCell className="dark:text-white">{mockup.designColor}</TableCell>
-                    <TableCell className="dark:text-white">{mockup.sizeCategory}</TableCell>
-                    <TableCell className="dark:text-white">{mockup.tshirtCategory}</TableCell>
-                    <TableCell align="right">
-                      <div className="flex justify-end space-x-2">
-                        <Tooltip title="Details">
-                          <IconButton 
-                            onClick={() => handlePreviewOpen(mockup.backgroundImagePreviewPath)}
-                            onMouseEnter={() => handleMouseEnter(mockup.backgroundImagePreviewPath)}
-                            className="hover:text-primary dark:text-white dark:hover:text-primary"
-                          >
-                            <VisibilityIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit">
-                          <IconButton 
-                            onClick={() => handleEdit(mockup.id)}
-                            className="hover:text-success dark:text-white dark:hover:text-success"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton 
-                            onClick={() => handleDeleteClick(mockup.id)}
-                            className="hover:text-danger dark:text-white dark:hover:text-danger"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+        <div className="rounded-sm border border-stroke bg-white p-4 shadow-default dark:border-strokedark dark:bg-boxdark">
+          <div className="flex flex-wrap justify-between gap-4 mb-6">
+            <div className="flex flex-wrap gap-4 flex-grow">
+              <input
+                type="text"
+                placeholder="Search by name..."
+                className="w-full max-w-xs rounded border border-stroke bg-transparent py-2 px-4 outline-none focus:border-primary focus-visible:shadow-none dark:border-strokedark dark:bg-meta-4 dark:focus:border-primary"
+                value={filters.name}
+                onChange={(e) => handleFilterChange('name', e.target.value)}
+              />
+              <select
+                className="w-full max-w-xs rounded border border-stroke bg-transparent py-2 px-4 outline-none focus:border-primary focus-visible:shadow-none dark:border-strokedark dark:bg-meta-4 dark:focus:border-primary"
+                value={filters.category}
+                onChange={(e) => handleFilterChange('category', e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {Array.from(new Set(mockups.map(m => m.category))).map(category => (
+                  <option key={category} value={category}>{category}</option>
                 ))}
-              </TableBody>
-            </Table>
+              </select>
+              <select
+                className="w-full max-w-xs rounded border border-stroke bg-transparent py-2 px-4 outline-none focus:border-primary focus-visible:shadow-none dark:border-strokedark dark:bg-meta-4 dark:focus:border-primary"
+                value={filters.genderCategory}
+                onChange={(e) => handleFilterChange('genderCategory', e.target.value)}
+              >
+                <option value="">All Genders</option>
+                {Array.from(new Set(mockups.map(m => m.genderCategory))).map(gender => (
+                  <option key={gender} value={gender}>{gender}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </Card>
+
+          <Card className="rounded-sm border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
+            <div className="max-w-full overflow-x-auto">
+              <Table className="dark:text-white">
+                <TableHead>
+                  <TableRow className="dark:border-strokedark">
+                    <TableCell className="dark:text-white">Preview</TableCell>
+                    <TableCell className="dark:text-white">Name</TableCell>
+                    <TableCell className="dark:text-white">Category</TableCell>
+                    <TableCell className="dark:text-white">Gender</TableCell>
+                    <TableCell className="dark:text-white">Color</TableCell>
+                    <TableCell className="dark:text-white">Size</TableCell>
+                    <TableCell className="dark:text-white">Type</TableCell>
+                    <TableCell align="right" className="dark:text-white">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredMockups.map((mockup) => (
+                    <TableRow 
+                      key={mockup.id}
+                      className="hover:bg-gray-2 dark:hover:bg-meta-4 dark:border-strokedark"
+                    >
+                      <TableCell className="dark:text-white">
+                        <div className="relative w-12.5 h-12.5">
+                          <Image 
+                            src={mockup.backgroundImagePreviewPath} 
+                            alt={mockup.name}
+                            fill
+                            sizes="(max-width: 50px) 100vw"
+                            className="rounded-md object-cover"
+                            loading="lazy"
+                            placeholder="blur"
+                            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRoaHSQrJyEwSkNOPTYwPTYyRkNUSFZIMS8wTEY3RkVQWUZGUktLe4JzXHJFR0X/2wBDABUXFx4aHh0eHUEgICBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUX/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="dark:text-white">{mockup.name}</TableCell>
+                      <TableCell className="dark:text-white">{mockup.category}</TableCell>
+                      <TableCell className="dark:text-white">{mockup.genderCategory}</TableCell>
+                      <TableCell className="dark:text-white">{mockup.designColor}</TableCell>
+                      <TableCell className="dark:text-white">{mockup.sizeCategory}</TableCell>
+                      <TableCell className="dark:text-white">{mockup.tshirtCategory}</TableCell>
+                      <TableCell align="right">
+                        <div className="flex justify-end space-x-2">
+                          <Tooltip title="Details">
+                            <IconButton 
+                              onClick={() => handlePreviewOpen(mockup.backgroundImagePreviewPath)}
+                              onMouseEnter={() => handleMouseEnter(mockup.backgroundImagePreviewPath)}
+                              className="hover:text-primary dark:text-white dark:hover:text-primary"
+                            >
+                              <VisibilityIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Edit">
+                            <IconButton 
+                              onClick={() => handleEdit(mockup.id)}
+                              className="hover:text-success dark:text-white dark:hover:text-success"
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton 
+                              onClick={() => handleDeleteClick(mockup.id)}
+                              className="hover:text-danger dark:text-white dark:hover:text-danger"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}
