@@ -7,6 +7,20 @@ const API_URL = 'http://localhost:5002/api';
 axios.defaults.headers.post['Content-Type'] = 'application/json';
 axios.defaults.headers.post['Accept'] = 'application/json';
 
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error parsing JWT:', error);
+    return null;
+  }
+}
+
 export const authService = {
   async login(username: string, password: string) {
     try {
@@ -42,7 +56,7 @@ export const authService = {
       return response.data;
     } catch (error: any) {
       console.error('Login error:', error);
-      
+
       if (error.response) {
         console.error('Error response:', error.response.data);
         throw new Error(error.response.data.message || 'Invalid credentials');
@@ -60,9 +74,14 @@ export const authService = {
   },
 
   getCurrentUser() {
-    const userStr = localStorage.getItem('user');
-    if (userStr) return JSON.parse(userStr);
-    return null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return null;
+      return JSON.parse(userStr);
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
   },
 
   getToken() {
