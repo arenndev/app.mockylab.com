@@ -519,16 +519,14 @@ const EditMockupPage = () => {
 
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-        const response = await fetch(`${API_URL}/api/Mockup/${mockupId}`);
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch mockup data');
-        }
+        // 1. Önce mockup verilerini al
+        const mockupResponse = await fetch(`${API_URL}/api/Mockup/${mockupId}`);
+        if (!mockupResponse.ok) throw new Error('Failed to fetch mockup data');
+        const mockupResult = await mockupResponse.json();
 
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-          const mockup = result.data;
+        if (mockupResult.success && mockupResult.data) {
+          const mockup = mockupResult.data;
           
           // Form verilerini güncelle
           setFormData(prev => ({
@@ -541,68 +539,40 @@ const EditMockupPage = () => {
             designColor: mockup.designColor || DesignColor.BLACK
           }));
 
-          // Eğer mockup'ın bir resmi varsa, canvas'a yükle
-          if (mockup.backgroundImagePath) {
-            fabric.Image.fromURL(mockup.backgroundImagePath, {}, (img: fabric.Image) => {
-              if (canvas) {
-                const scale = Math.min(
-                  canvas.width! / img.width!,
-                  canvas.height! / img.height!
-                );
-                
-                img.scale(scale);
-                img.set({
-                  left: (canvas.width! - img.width! * scale) / 2,
-                  top: (canvas.height! - img.height! * scale) / 2,
-                  selectable: false,
-                  evented: false
-                });
-                
-                canvas.clear();
-                canvas.add(img);
-                canvas.renderAll();
+          // 2. Canvas'ı temizle ve arkaplan resmini yükle
+          if (canvas && mockup.backgroundImagePath) {
+            canvas.clear();
+            
+            const img = new Image();
+            img.onload = () => {
+              const fabricImage = new fabric.Image(img);
+              const scale = Math.min(
+                canvas.width! / img.width,
+                canvas.height! / img.height
+              );
+              
+              fabricImage.set({
+                scaleX: scale,
+                scaleY: scale,
+                left: (canvas.width! - img.width * scale) / 2,
+                top: (canvas.height! - img.height * scale) / 2,
+                selectable: false,
+                evented: false
+              });
+              
+              canvas.add(fabricImage);
+              canvas.renderAll();
 
-                // Orijinal görsel boyutlarını sakla
-                setOriginalImageSize({
-                  width: img.width!,
-                  height: img.height!
-                });
-              }
-            });
-          }
-
-          // Design areas varsa yükle
-          if (mockup.designAreas && mockup.designAreas.length > 0) {
-            mockup.designAreas.forEach((area: MockupDesignArea) => {
-              const rect = new fabric.Rect({
-                width: area.width,
-                height: area.height,
-                fill: 'black',
-                strokeWidth: 0,
-                originX: 'center',
-                originY: 'center'
-              }) as DesignRect;
-
-              const text = new fabric.Text(area.name || 'Design Area', {
-                fontSize: 14,
-                fill: 'white',
-                originX: 'center',
-                originY: 'center'
+              setOriginalImageSize({
+                width: img.width,
+                height: img.height
               });
 
-              const group = new fabric.Group([rect, text], {
-                left: area.centerX,
-                top: area.centerY,
-                angle: area.angle || 0,
-                originX: 'center',
-                originY: 'center'
-              });
+              // 3. Design area'ları yükle
+              fetchDesignAreas();
+            };
 
-              rect.designAreaName = area.name;
-              canvas?.add(group);
-            });
-
-            canvas?.renderAll();
+            img.src = mockup.backgroundImagePath;
           }
         }
       } catch (error) {
@@ -610,6 +580,80 @@ const EditMockupPage = () => {
         setAlertState({
           show: true,
           message: 'Failed to load mockup data',
+          type: 'error'
+        });
+      }
+    };
+
+    const fetchDesignAreas = async () => {
+      if (!canvas) return;
+      
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+        const response = await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas`);
+        
+        if (!response.ok) throw new Error('Failed to fetch design areas');
+        
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          // Canvas üzerindeki görseli bul
+          const backgroundImage = canvas.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
+          if (!backgroundImage) return;
+
+          // Görsel pozisyonunu ve ölçeğini al
+          const imgLeft = backgroundImage.left!;
+          const imgTop = backgroundImage.top!;
+          const imgScale = backgroundImage.scaleX!; // veya scaleY, ikisi de aynı olmalı
+
+          result.data.forEach((area: MockupDesignArea) => {
+            if (!canvas) return;
+
+            // Design area'nın görsel üzerindeki göreceli pozisyonunu hesapla
+            const scaledWidth = area.width * imgScale;
+            const scaledHeight = area.height * imgScale;
+            
+            // Görselin sol üst köşesine göre pozisyonu hesapla
+            const scaledLeft = imgLeft + (area.centerX * imgScale);
+            const scaledTop = imgTop + (area.centerY * imgScale);
+
+            const rect = new fabric.Rect({
+              width: scaledWidth,
+              height: scaledHeight,
+              fill: 'black',
+              strokeWidth: 0,
+              originX: 'center',
+              originY: 'center'
+            }) as DesignRect;
+
+            const text = new fabric.Text(area.name || 'Design Area', {
+              fontSize: 14,
+              fill: 'white',
+              originX: 'center',
+              originY: 'center'
+            });
+
+            const group = new fabric.Group([rect, text], {
+              left: scaledLeft,
+              top: scaledTop,
+              angle: area.angle || 0,
+              originX: 'center',
+              originY: 'center',
+              selectable: true,
+              hasControls: true
+            });
+
+            rect.designAreaName = area.name;
+            canvas.add(group);
+          });
+
+          canvas.renderAll();
+        }
+      } catch (error) {
+        console.error('Error fetching design areas:', error);
+        setAlertState({
+          show: true,
+          message: 'Failed to load design areas',
           type: 'error'
         });
       }
