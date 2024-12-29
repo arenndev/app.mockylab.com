@@ -38,6 +38,7 @@ const menuGroups = [
           { label: 'Mockup List', route: '/mockup/list' },
           { label: 'Mockup Add', route: '/mockup/add' },
           { label: 'Favorite', route: '/mockup/favorite' },
+          { label: 'Generate', route: '/mockup/generate' },
         ]
       },
       {
