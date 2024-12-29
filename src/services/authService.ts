@@ -7,7 +7,7 @@ const API_URL = 'http://localhost:5002/api';
 axios.defaults.headers.post['Content-Type'] = 'application/json';
 axios.defaults.headers.post['Accept'] = 'application/json';
 
-function parseJwt(token: string) {
+export function parseJwt(token: string) {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -34,9 +34,17 @@ export const authService = {
       console.log('Login response:', response.data);
       
       if (response.data.token) {
+        // Create user object with necessary information
+        const user = {
+          userId: response.data.userId,
+          username: response.data.username,
+          roles: response.data.roles || [],
+          token: response.data.token
+        };
+
         // Store in both localStorage and cookies
         localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data));
+        localStorage.setItem('user', JSON.stringify(user));
         
         // Set cookie with options
         Cookies.set('token', response.data.token, {

@@ -7,6 +7,8 @@ import Image from 'next/image';
 import axios from 'axios';
 import Loader from '@/components/common/Loader';
 import { useRouter } from 'next/navigation';
+import { authService } from '@/services/authService';
+import { parseJwt } from '@/services/authService';
 
 // Enum tanımlamaları
 enum TshirtCategory {
@@ -281,6 +283,22 @@ const AddMockupPage = () => {
     try {
       setIsLoading(true);
 
+      // Token kontrolü
+      const token = authService.getToken();
+      if (!token) {
+        router.push('/auth/signin');
+        return;
+      }
+
+      // User bilgisini al
+      const currentUser = authService.getCurrentUser();
+      console.log('Current user:', currentUser); // Debug için log ekleyelim
+      
+      if (!currentUser || !currentUser.userId) {
+        router.push('/auth/signin');
+        return;
+      }
+
       if (!formData.imageFile) {
         throw new Error('Please select an image file');
       }
@@ -310,14 +328,19 @@ const AddMockupPage = () => {
       formDataToSend.append('TshirtCategory', formData.tshirtCategory);
       formDataToSend.append('SizeCategory', formData.sizeCategory);
       formDataToSend.append('ImageFile', formData.imageFile);
+      formDataToSend.append('UserId', currentUser.userId);
 
       const response = await fetch(`${API_URL}/api/Mockup`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formDataToSend,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create mockup');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create mockup');
       }
 
       const result = await response.json();
@@ -371,6 +394,7 @@ const AddMockupPage = () => {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
               },
               body: JSON.stringify(designArea)
             });
