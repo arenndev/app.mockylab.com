@@ -6,17 +6,23 @@ import { useRouter } from 'next/navigation';
 import { authService } from "@/services/authService";
 import axios from 'axios';
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import DeleteConfirmModal from "./DeleteConfirmModal";
 
 interface FavoriteList {
   id: number;
   name: string;
   category?: string;
+  Category?: string;
   mockups: Mockup[];
 }
 
 interface Mockup {
   id: number;
   name: string;
+  backgroundImagePreviewPath: string;
+  category?: string;
+  genderCategory?: string;
+  sizeCategory?: string;
 }
 
 const FavoritePage = () => {
@@ -30,6 +36,21 @@ const FavoritePage = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [deletingListIds, setDeletingListIds] = useState<number[]>([]);
   const [addingMockupToListId, setAddingMockupToListId] = useState<number | null>(null);
+  const [removingMockupIds, setRemovingMockupIds] = useState<{listId: number, mockupId: number}[]>([]);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    type: 'list' | 'mockup';
+    listId: number;
+    mockupId?: number;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'list',
+    listId: 0,
+    title: '',
+    message: ''
+  });
 
   const fetchLists = async () => {
     try {
@@ -49,17 +70,34 @@ const FavoritePage = () => {
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+      
       const response = await axios.get(`${API_URL}/api/Favorite/${user.userId}/lists`);
+      console.log("API Response:", response.data);
+      
+      let newLists: FavoriteList[] = [];
       
       if (Array.isArray(response.data)) {
-        console.log("Lists fetched successfully:", response.data);
-        setLists(response.data);
+        newLists = response.data.map((list: any) => ({
+          ...list,
+          category: list.category || list.Category
+        }));
+        console.log("Mapped lists from array:", newLists);
       } else if (response.data.success && Array.isArray(response.data.data)) {
-        console.log("Lists fetched successfully:", response.data.data);
-        setLists(response.data.data);
+        newLists = response.data.data.map((list: any) => ({
+          ...list,
+          category: list.category || list.Category
+        }));
+        console.log("Mapped lists from data:", newLists);
       } else {
         console.error("Unexpected response format:", response.data);
+        return;
       }
+
+      // Mevcut state ile karşılaştır ve sadece değişiklik varsa güncelle
+      setLists(prevLists => {
+        const hasChanged = JSON.stringify(prevLists) !== JSON.stringify(newLists);
+        return hasChanged ? newLists : prevLists;
+      });
     } catch (error) {
       console.error("Error fetching lists:", error);
     }
@@ -74,7 +112,14 @@ const FavoritePage = () => {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const response = await axios.get(`${API_URL}/api/Mockup`);
       if (response.data.success) {
-        setMockups(response.data.data);
+        setMockups(response.data.data.map((mockup: any) => ({
+          id: mockup.id,
+          name: mockup.name,
+          backgroundImagePreviewPath: mockup.backgroundImagePreviewPath,
+          category: mockup.category,
+          genderCategory: mockup.genderCategory,
+          sizeCategory: mockup.sizeCategory
+        })));
       }
     } catch (error) {
       console.error("Error fetching mockups:", error);
@@ -105,16 +150,14 @@ const FavoritePage = () => {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const response = await axios.post(
-        `${API_URL}/api/Favorite/${user.userId}/lists?listName=${encodeURIComponent(
-          newListName
-        )}&category=${encodeURIComponent(newListCategory)}`
+        `${API_URL}/api/Favorite/${user.userId}/lists?listName=${encodeURIComponent(newListName)}&category=${encodeURIComponent(newListCategory)}`
       );
       
-      if (response.data.success) {
+      if (response.data) {
         setNewListName("");
         setNewListCategory("");
-        await fetchLists();
-        console.log("List created and lists refreshed");
+        // Sayfayı yeniden yükle
+        window.location.reload();
       } else {
         console.error("Failed to create list:", response.data);
       }
@@ -125,27 +168,53 @@ const FavoritePage = () => {
     }
   };
 
-  const deleteList = async (listId: number) => {
+  const handleDeleteList = async (listId: number) => {
+    setDeleteModal({
+      isOpen: true,
+      type: 'list',
+      listId,
+      title: 'Delete List',
+      message: 'Are you sure you want to delete this list? This action cannot be undone.'
+    });
+  };
+
+  const handleDeleteMockup = (listId: number, mockupId: number) => {
+    setDeleteModal({
+      isOpen: true,
+      type: 'mockup',
+      listId,
+      mockupId,
+      title: 'Remove Mockup',
+      message: 'Are you sure you want to remove this mockup from the list? This action cannot be undone.'
+    });
+  };
+
+  const handleConfirmDelete = async () => {
     try {
-      setDeletingListIds(prev => [...prev, listId]);
       const token = authService.getToken();
       if (!token) return;
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      const response = await axios.delete(`${API_URL}/api/Favorite/lists/${listId}`);
-      
-      if (response.data.success) {
-        await fetchLists();
+
+      if (deleteModal.type === 'list') {
+        setDeletingListIds(prev => [...prev, deleteModal.listId]);
+        await axios.delete(`${API_URL}/api/Favorite/lists/${deleteModal.listId}`);
+      } else if (deleteModal.type === 'mockup' && deleteModal.mockupId) {
+        setRemovingMockupIds(prev => [...prev, { listId: deleteModal.listId, mockupId: deleteModal.mockupId! }]);
+        await axios.delete(
+          `${API_URL}/api/Favorite/lists/${deleteModal.listId}/mockups/${deleteModal.mockupId}`
+        );
       }
+
+      // Sayfayı yeniden yükle
+      window.location.reload();
     } catch (error) {
-      console.error("Error deleting list:", error);
-    } finally {
-      setDeletingListIds(prev => prev.filter(id => id !== listId));
+      console.error("Error deleting:", error);
     }
   };
 
-  const addMockupToList = async (listId: number, mockupId: number) => {
+  const addMockupToList = async (listId: number, mockupIds: number[]) => {
     try {
       setAddingMockupToListId(listId);
       const token = authService.getToken();
@@ -153,15 +222,17 @@ const FavoritePage = () => {
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+      
       const response = await axios.post(
-        `${API_URL}/api/Favorite/lists/${listId}/mockups/${mockupId}`
+        `${API_URL}/api/Favorite/lists/${listId}/mockups/batch`,
+        mockupIds
       );
       
       if (response.data.success) {
         await fetchLists();
       }
     } catch (error) {
-      console.error("Error adding mockup to list:", error);
+      console.error("Error adding mockups to list:", error);
     } finally {
       setAddingMockupToListId(null);
     }
@@ -169,20 +240,47 @@ const FavoritePage = () => {
 
   const removeMockupFromList = async (listId: number, mockupId: number) => {
     try {
+      setRemovingMockupIds(prev => [...prev, { listId, mockupId }]);
+      
       const token = authService.getToken();
-      if (!token) return;
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
+
+      // Optimistik güncelleme - UI'ı hemen güncelle
+      setLists(prevLists => 
+        prevLists.map(list => {
+          if (list.id === listId) {
+            return {
+              ...list,
+              mockups: list.mockups.filter(m => m.id !== mockupId)
+            };
+          }
+          return list;
+        })
+      );
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+      
       const response = await axios.delete(
         `${API_URL}/api/Favorite/lists/${listId}/mockups/${mockupId}`
       );
       
-      if (response.data.success) {
-        fetchLists();
+      if (!response.data.success) {
+        // Silme işlemi başarısız olduysa, değişiklikleri geri al
+        console.error("Failed to remove mockup:", response.data);
+        await fetchLists(); // Orijinal listeyi geri yükle
       }
     } catch (error) {
       console.error("Error removing mockup from list:", error);
+      // Hata durumunda da orijinal listeyi geri yükle
+      await fetchLists();
+    } finally {
+      setRemovingMockupIds(prev => 
+        prev.filter(item => !(item.listId === listId && item.mockupId === mockupId))
+      );
     }
   };
 
@@ -290,12 +388,18 @@ const FavoritePage = () => {
                               >
                                 {mockup.name}
                                 <button
-                                  onClick={() =>
-                                    removeMockupFromList(list.id, mockup.id)
-                                  }
-                                  className="text-meta-1 hover:text-meta-1"
+                                  onClick={() => handleDeleteMockup(list.id, mockup.id)}
+                                  disabled={removingMockupIds.some(item => item.listId === list.id && item.mockupId === mockup.id)}
+                                  className="text-meta-1 hover:text-meta-1 disabled:opacity-50"
                                 >
-                                  ×
+                                  {removingMockupIds.some(item => item.listId === list.id && item.mockupId === mockup.id) ? (
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                                    </svg>
+                                  ) : (
+                                    "×"
+                                  )}
                                 </button>
                               </span>
                             ))}
@@ -304,7 +408,7 @@ const FavoritePage = () => {
                       </td>
                       <td className="border-b border-[#eee] px-4 py-5">
                         <p className="text-black dark:text-white">
-                          {list.category || '-'}
+                          {list.category?.trim() || list.Category?.trim() || '-'}
                         </p>
                       </td>
                       <td className="border-b border-[#eee] px-4 py-5">
@@ -343,7 +447,7 @@ const FavoritePage = () => {
                             )}
                           </button>
                           <button
-                            onClick={() => deleteList(list.id)}
+                            onClick={() => handleDeleteList(list.id)}
                             disabled={deletingListIds.includes(list.id)}
                             className="hover:text-meta-1 disabled:opacity-50"
                             title="Delete List"
@@ -386,12 +490,21 @@ const FavoritePage = () => {
           setIsModalOpen(false);
           setSelectedListId(null);
         }}
-        onAdd={(mockupId) => {
+        onAdd={(mockupIds) => {
           if (selectedListId) {
-            addMockupToList(selectedListId, mockupId);
+            addMockupToList(selectedListId, mockupIds);
           }
         }}
         mockups={mockups}
+        currentListMockups={lists.find(list => list.id === selectedListId)?.mockups.map(m => m.id) || []}
+      />
+
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={handleConfirmDelete}
+        title={deleteModal.title}
+        message={deleteModal.message}
       />
     </DefaultLayout>
   );
