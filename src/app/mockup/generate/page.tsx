@@ -319,6 +319,187 @@ const DesignAreaUpload = ({ area, mockupId, file, onChange }: DesignAreaUploadPr
   );
 };
 
+const MockupCard = ({ 
+  mockup, 
+  onSingleImageUpload, 
+  onDesignFileChange,
+  singleImageUpload,
+  designFiles 
+}: { 
+  mockup: Mockup;
+  onSingleImageUpload: (mockupId: number, file: File | null) => void;
+  onDesignFileChange: (designAreaId: number, mockupId: number, file: File | null) => void;
+  singleImageUpload?: SingleImageUpload;
+  designFiles: DesignFileWithPreview[];
+}) => {
+  const [showIndividualUploads, setShowIndividualUploads] = useState(false);
+
+  return (
+    <div className="rounded-lg border border-stroke bg-white p-4 dark:border-strokedark dark:bg-boxdark">
+      {/* Mockup Header */}
+      <div className="flex items-center gap-4 mb-4">
+        <div className="relative w-20 h-20 rounded-lg overflow-hidden">
+          <Image
+            src={formatImagePath(mockup.backgroundImagePreviewPath)}
+            alt={mockup.name}
+            fill
+            className="object-cover"
+          />
+          {mockup.designAreas?.map((area, index) => (
+            <div
+              key={area.id}
+              className="absolute w-6 h-6 -ml-3 -mt-3 flex items-center justify-center bg-primary text-white rounded-full text-sm font-bold shadow-lg"
+              style={{
+                left: `${area.centerX}%`,
+                top: `${area.centerY}%`,
+                transform: `rotate(${area.angle}deg)`,
+              }}
+            >
+              {index + 1}
+            </div>
+          ))}
+        </div>
+        <div>
+          <h4 className="font-medium text-black dark:text-white">
+            {mockup.name}
+          </h4>
+          <p className="text-sm text-gray-500">
+            {mockup.designAreas?.length} design areas
+          </p>
+        </div>
+      </div>
+
+      {/* Upload Options */}
+      <div className="space-y-4">
+        {/* Single Image Upload */}
+        {!showIndividualUploads ? (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-sm font-medium text-black dark:text-white">
+                Upload one image for all areas
+              </label>
+              <button
+                onClick={() => setShowIndividualUploads(true)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-primary bg-opacity-10 text-primary rounded-lg hover:bg-opacity-20 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-sm font-medium">Upload individual images</span>
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => onSingleImageUpload(mockup.id, e.target.files?.[0] || null)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              />
+              <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
+                {singleImageUpload?.previewUrl ? (
+                  <div className="relative w-full h-full">
+                    <Image
+                      src={singleImageUpload.previewUrl}
+                      alt="Preview"
+                      fill
+                      className="object-contain"
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSingleImageUpload(mockup.id, null);
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-sm text-gray-500">Click or drop image here</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-sm font-medium text-black dark:text-white">
+                Upload individual images
+              </label>
+              <button
+                onClick={() => {
+                  setShowIndividualUploads(false);
+                  mockup.designAreas?.forEach(area => {
+                    onDesignFileChange(area.id, mockup.id, null);
+                  });
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-meta-1 bg-opacity-10 text-meta-1 rounded-lg hover:bg-opacity-20 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-sm font-medium">Use single image</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {mockup.designAreas?.map((area, index) => {
+                const designFile = designFiles.find(df => df.designAreaId === area.id && df.mockupId === mockup.id);
+                return (
+                  <div key={area.id} className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => onDesignFileChange(area.id, mockup.id, e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
+                      {designFile?.previewUrl ? (
+                        <div className="relative w-full h-full">
+                          <Image
+                            src={designFile.previewUrl}
+                            alt="Preview"
+                            fill
+                            className="object-contain"
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDesignFileChange(area.id, mockup.id, null);
+                            }}
+                            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-primary text-white rounded-full text-sm font-bold">
+                            {index + 1}
+                          </div>
+                          <span className="text-xs text-gray-500">{area.width}x{area.height}px</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const GeneratePage = () => {
   const router = useRouter();
   const [lists, setLists] = useState<FavoriteList[]>([]);
@@ -626,150 +807,18 @@ const GeneratePage = () => {
                 </h3>
               </div>
               <div className="p-6.5">
-                {mocksToShow.map(mockup => (
-                  <div key={mockup.id} className="mb-8 last:mb-0">
-                    <div className="flex items-center gap-4 mb-6 p-4 bg-gray-1 dark:bg-meta-4 rounded-lg">
-                      <div className="relative w-24 h-24 rounded-lg overflow-hidden">
-                        <Image
-                          src={formatImagePath(mockup.backgroundImagePreviewPath)}
-                          alt={mockup.name}
-                          fill
-                          className="object-cover"
-                        />
-                        {mockup.designAreas?.map((area, index) => (
-                          <div
-                            key={area.id}
-                            className="absolute w-6 h-6 -ml-3 -mt-3 flex items-center justify-center bg-primary text-white rounded-full text-sm font-bold shadow-lg"
-                            style={{
-                              left: `${area.centerX}%`,
-                              top: `${area.centerY}%`,
-                              transform: `rotate(${area.angle}deg)`,
-                            }}
-                          >
-                            {index + 1}
-                          </div>
-                        ))}
-                      </div>
-                      <div>
-                        <h4 className="text-xl font-semibold text-black dark:text-white">
-                          {mockup.name}
-                        </h4>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {mockup.category && <span className="mr-2">{mockup.category}</span>}
-                          {mockup.genderCategory && <span className="mr-2">{mockup.genderCategory}</span>}
-                          {mockup.sizeCategory && <span>{mockup.sizeCategory}</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Single Image Upload Option */}
-                    <div className="mb-6 pl-4">
-                      <div className="flex items-center gap-3 mb-4">
-                        <h3 className="font-medium text-black dark:text-white">
-                          Single Image for All Design Areas
-                        </h3>
-                        <div className="text-xs text-gray-500">
-                          (Optional)
-                        </div>
-                      </div>
-                      
-                      {!singleImageUploads.find(u => u.mockupId === mockup.id)?.file ? (
-                        <div className="relative w-full max-w-md">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleSingleImageUpload(mockup.id, e.target.files?.[0] || null)}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                          />
-                          <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
-                            <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span className="text-sm text-gray-500">Upload one image for all design areas</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="relative w-full max-w-md">
-                          <div className="relative h-[120px] rounded-lg overflow-hidden bg-black/5">
-                            <Image
-                              src={singleImageUploads.find(u => u.mockupId === mockup.id)?.previewUrl!}
-                              alt="Preview"
-                              fill
-                              className="object-contain"
-                            />
-                          </div>
-                          <button
-                            onClick={() => handleSingleImageUpload(mockup.id, null)}
-                            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Individual Design Area Uploads */}
-                    {!singleImageUploads.find(u => u.mockupId === mockup.id)?.file && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pl-4">
-                        {mockup.designAreas?.map((area, index) => (
-                          <div key={area.id} className="rounded-lg border border-stroke bg-white p-4 dark:border-strokedark dark:bg-boxdark">
-                            <div className="flex items-center gap-3 mb-4">
-                              <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-primary text-white rounded-full text-sm font-bold">
-                                {index + 1}
-                              </div>
-                              <div>
-                                <h3 className="font-medium text-black dark:text-white">
-                                  {area.name}
-                                </h3>
-                                <p className="text-xs text-gray-500">
-                                  {area.width}x{area.height}px
-                                </p>
-                              </div>
-                            </div>
-
-                            {!designFiles.find(df => df.designAreaId === area.id && df.mockupId === mockup.id)?.designFile ? (
-                              <div className="relative">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => handleFileChange(area.id, mockup.id, e.target.files?.[0] || null)}
-                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                />
-                                <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
-                                  <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  <span className="text-sm text-gray-500">Click or drop image here</span>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="relative">
-                                <div className="relative h-[120px] rounded-lg overflow-hidden bg-black/5">
-                                  <Image
-                                    src={designFiles.find(df => df.designAreaId === area.id && df.mockupId === mockup.id)?.previewUrl!}
-                                    alt="Preview"
-                                    fill
-                                    className="object-contain"
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => handleFileChange(area.id, mockup.id, null)}
-                                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {mocksToShow.map(mockup => (
+                    <MockupCard
+                      key={mockup.id}
+                      mockup={mockup}
+                      onSingleImageUpload={handleSingleImageUpload}
+                      onDesignFileChange={handleFileChange}
+                      singleImageUpload={singleImageUploads.find(u => u.mockupId === mockup.id)}
+                      designFiles={designFiles}
+                    />
+                  ))}
+                </div>
 
                 <button
                   onClick={handleGenerate}
