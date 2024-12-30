@@ -23,12 +23,29 @@ const menuGroups = [
             className="fill-current"
             width="18"
             height="18"
-            viewBox="0 0 18 18"
+            viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
             <path
-              d="M6.10322 0.956299H2.53135C1.5751 0.956299 0.787598 1.7438 0.787598 2.70005V15.4688C0.787598 16.425 1.5751 17.2125 2.53135 17.2125H6.10322C7.05947 17.2125 7.84697 16.425 7.84697 15.4688V2.72817C7.8751 1.7438 7.0876 0.956299 6.10322 0.956299Z"
+              d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"
+              fill="currentColor"
+            />
+            <path
+              d="M7 7h4v4H7z"
+              fill="currentColor"
+            />
+            <path
+              d="M13 7h4v4h-4z"
+              fill="currentColor"
+            />
+            <path
+              d="M7 13h4v4H7z"
+              fill="currentColor"
+            />
+            <path
+              d="M13 13h4v4h-4z"
+              fill="currentColor"
             />
           </svg>
         ),
@@ -38,8 +55,39 @@ const menuGroups = [
           { label: 'Mockup List', route: '/mockup/list' },
           { label: 'Mockup Add', route: '/mockup/add' },
           { label: 'Favorite', route: '/mockup/favorite' },
-          { label: 'Generate', route: '/mockup/generate' },
+          { label: 'Generate', route: '/mockup/generate' }
         ]
+      },
+      {
+        icon: (
+          <svg
+            className="fill-current"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"
+              fill="currentColor"
+            />
+            <path
+              d="M6.5 9C7.33 9 8 8.33 8 7.5S7.33 6 6.5 6 5 6.67 5 7.5 5.67 9 6.5 9z"
+              fill="currentColor"
+            />
+            <path
+              d="M19 12l-7-3-7 3V6h14z"
+              fill="currentColor"
+            />
+            <path
+              d="M19 18H5l7-6z"
+              fill="currentColor"
+            />
+          </svg>
+        ),
+        label: "Design Create",
+        route: "/desingcreate",
       },
       {
         icon: (
@@ -52,7 +100,7 @@ const menuGroups = [
             xmlns="http://www.w3.org/2000/svg"
           >
             <path
-              d="M6.10322 0.956299H2.53135C1.5751 0.956299 0.787598 1.7438 0.787598 2.70005V6.27192C0.787598 7.22817 1.5751 8.01567 2.53135 8.01567H6.10322C7.05947 8.01567 7.84697 7.22817 7.84697 6.27192V2.72817C7.8751 1.7438 7.0876 0.956299 6.10322 0.956299ZM6.60947 6.30005C6.60947 6.5813 6.38447 6.8063 6.10322 6.8063H2.53135C2.2501 6.8063 2.0251 6.5813 2.0251 6.30005V2.72817C2.0251 2.44692 2.2501 2.22192 2.53135 2.22192H6.10322C6.38447 2.22192 6.60947 2.44692 6.60947 2.72817V6.30005Z"
+              d="M6.10322 0.956299H2.53135C1.5751 0.956299 0.787598 1.7438 0.787598 2.70005V15.4688C0.787598 16.425 1.5751 17.2125 2.53135 17.2125H6.10322C7.05947 17.2125 7.84697 16.425 7.84697 15.4688V2.72817C7.8751 1.7438 7.0876 0.956299 6.10322 0.956299ZM6.60947 6.30005C6.60947 6.5813 6.38447 6.8063 6.10322 6.8063H2.53135C2.2501 6.8063 2.0251 6.5813 2.0251 6.30005V2.72817C2.0251 2.44692 2.2501 2.22192 2.53135 2.22192H6.10322C6.38447 2.22192 6.60947 2.44692 6.60947 2.72817V6.30005Z"
               fill=""
             />
             <path
