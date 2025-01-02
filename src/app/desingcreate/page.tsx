@@ -14,7 +14,9 @@ export default function DesignCreate() {
   const [description, setDescription] = useState<string>("");
   const [tempPath, setTempPath] = useState<string>("");
   const [remixedImageUrl, setRemixedImageUrl] = useState<string>("");
+  const [backgroundRemovedImageUrl, setBackgroundRemovedImageUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRemovingBackground, setIsRemovingBackground] = useState(false);
   const router = useRouter();
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,6 +70,46 @@ export default function DesignCreate() {
     }
   };
 
+  const handleBackgroundRemoval = async (imageUrl: string) => {
+    setIsRemovingBackground(true);
+    try {
+      const token = authService.getToken();
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+      const response = await axios.post(
+        `${API_URL}/api/Ideogram/remove-background`,
+        { imageUrl: imageUrl },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log("Background Removal Response:", response.data);
+      if (response.data.url) {
+        setBackgroundRemovedImageUrl(response.data.url);
+      } else if (response.data.backgroundRemovedImageUrl) {
+        setBackgroundRemovedImageUrl(response.data.backgroundRemovedImageUrl);
+      } else {
+        console.error("Unexpected API response format:", response.data);
+      }
+    } catch (error: any) {
+      console.error("Error removing background:", error);
+      if (error.response) {
+        console.error("Server Error Data:", error.response.data);
+        console.error("Server Error Status:", error.response.status);
+      }
+    } finally {
+      setIsRemovingBackground(false);
+    }
+  };
+
   const handleRemix = async () => {
     if (!description || !tempPath) return;
 
@@ -98,6 +140,10 @@ export default function DesignCreate() {
 
       console.log("Remix API Response:", response.data);
       setRemixedImageUrl(response.data.remixImageUrl);
+      
+      if (response.data.remixImageUrl) {
+        await handleBackgroundRemoval(response.data.remixImageUrl);
+      }
     } catch (error: any) {
       console.error("Error remixing image:", error);
       if (error.response) {
@@ -114,8 +160,9 @@ export default function DesignCreate() {
     }
   };
 
-  const handleDownload = async () => {
-    if (!remixedImageUrl) return;
+  const handleDownload = async (withBackground: boolean = true) => {
+    const imageUrl = withBackground ? remixedImageUrl : backgroundRemovedImageUrl;
+    if (!imageUrl) return;
 
     try {
       setIsLoading(true);
@@ -126,18 +173,24 @@ export default function DesignCreate() {
         return;
       }
 
-      // Backend üzerinden indirme işlemi
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      const response = await fetch(`${API_URL}/api/Ideogram/download-image?imageUrl=${encodeURIComponent(remixedImageUrl)}`, {
+      let endpoint = withBackground 
+          ? `${API_URL}/api/Ideogram/download-image?imageUrl=${encodeURIComponent(imageUrl)}`
+          : `${API_URL}/api/Ideogram/get-processed-image?filePath=${encodeURIComponent(imageUrl)}`;
+
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!response.ok) throw new Error('Download failed');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Download failed: ${errorText}`);
+      }
 
       const blob = await response.blob();
-      const fileName = `remixed-image-${new Date().getTime()}.png`;
+      const fileName = `remixed-image-${withBackground ? 'with-bg' : 'no-bg'}-${new Date().getTime()}.png`;
       const url = window.URL.createObjectURL(blob);
       
       const link = document.createElement('a');
@@ -240,27 +293,53 @@ export default function DesignCreate() {
                         <h4 className="text-black dark:text-white">
                           Remixed Image
                         </h4>
-                        <button
-                          onClick={handleDownload}
-                          disabled={isLoading}
-                          className="flex items-center gap-2 rounded bg-primary px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDownload(true)}
+                            disabled={isLoading}
+                            className="flex items-center gap-2 rounded bg-primary px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                            />
-                          </svg>
-                          {isLoading ? "Downloading..." : "Download"}
-                        </button>
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                              />
+                            </svg>
+                            {isLoading ? "Downloading..." : "Download with Background"}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDownload(false)}
+                            disabled={isLoading || isRemovingBackground || !backgroundRemovedImageUrl}
+                            className="flex items-center gap-2 rounded bg-success px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                              />
+                            </svg>
+                            {isLoading ? "Downloading..." : 
+                             isRemovingBackground ? "Removing Background..." : 
+                             "Download without Background"}
+                          </button>
+                        </div>
                       </div>
                       <div className="relative h-[400px] w-full rounded-sm border border-stroke dark:border-strokedark">
                         <Image
