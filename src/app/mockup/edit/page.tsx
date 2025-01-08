@@ -32,9 +32,9 @@ enum GenderCategory {
 }
 
 enum DesignColor {
-  BLACK = 'Black',
-  WHITE = 'White',
-  COLOR = 'Color'
+  Black = "Black",
+  White = "White",
+  Color = "Color"
 }
 
 interface DesignArea {
@@ -161,7 +161,7 @@ const EditMockupPage = () => {
     tshirtCategory: TshirtCategory.TSHIRT,
     sizeCategory: SizeCategory.ADULT,
     genderCategory: GenderCategory.UNISEX,
-    designColor: DesignColor.BLACK,
+    designColor: DesignColor.Black,
     imageFile: null as File | null
   });
 
@@ -352,7 +352,7 @@ const EditMockupPage = () => {
           tshirtCategory: mockupResponse.data.data.tshirtCategory || TshirtCategory.TSHIRT,
           sizeCategory: mockupResponse.data.data.sizeCategory || SizeCategory.ADULT,
           genderCategory: mockupResponse.data.data.genderCategory || GenderCategory.UNISEX,
-          designColor: mockupResponse.data.data.designColor || DesignColor.BLACK
+          designColor: mockupResponse.data.data.designColor || DesignColor.Black
         }));
         
         if (mockupResponse.data.data.backgroundImagePath && canvas) {
@@ -703,7 +703,7 @@ const EditMockupPage = () => {
       formDataToSend.append('Name', formData.name);
       formDataToSend.append('Category', formData.category);
       formDataToSend.append('GenderCategory', formData.genderCategory);
-      formDataToSend.append('DesignColor', formData.designColor);
+      formDataToSend.append('DesignColor', formData.designColor.toString());
       formDataToSend.append('TshirtCategory', formData.tshirtCategory);
       formDataToSend.append('SizeCategory', formData.sizeCategory);
 
@@ -1145,9 +1145,9 @@ const EditMockupPage = () => {
                     onChange={handleInputChange}
                     className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
                   >
-                    {Object.values(DesignColor).map(color => (
-                      <option key={color} value={color}>{color}</option>
-                    ))}
+                    <option value={DesignColor.Black}>Black</option>
+                    <option value={DesignColor.White}>White</option>
+                    <option value={DesignColor.Color}>Color</option>
                   </select>
                 </div>
 

@@ -7,6 +7,12 @@ import axios from 'axios';
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Image from "next/image";
 
+enum DesignColor {
+  Black = "Black",
+  White = "White",
+  Color = "Color"
+}
+
 interface FavoriteList {
   id: number;
   name: string;
@@ -23,6 +29,7 @@ interface Mockup {
   category?: string;
   genderCategory?: string;
   sizeCategory?: string;
+  designColor?: string;
 }
 
 interface DesignArea {
@@ -38,7 +45,8 @@ interface DesignArea {
 interface DesignFile {
   designAreaId: number;
   designFile: File | null;
-  mockupId: number; // Added to track which mockup this design belongs to
+  mockupId: number;
+  designColor: string;
 }
 
 interface QuickSelectModalProps {
@@ -63,6 +71,7 @@ interface SingleImageUpload {
   mockupId: number;
   file: File | null;
   previewUrl?: string;
+  designColor: string;
 }
 
 const formatImagePath = (path: string) => {
@@ -319,24 +328,33 @@ const DesignAreaUpload = ({ area, mockupId, file, onChange }: DesignAreaUploadPr
   );
 };
 
-const MockupCard = ({ 
-  mockup, 
-  onSingleImageUpload, 
-  onDesignFileChange,
-  singleImageUpload,
-  designFiles 
-}: { 
+const ColorSelect = ({ value, onChange, mockupColor }: { value: string, onChange: (value: string) => void, mockupColor?: string }) => {
+  return (
+    <div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded border-[1.5px] border-stroke bg-transparent px-3 py-2 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input"
+      >
+        <option value={DesignColor.Black}>Black</option>
+        <option value={DesignColor.White}>White</option>
+        <option value={DesignColor.Color}>Color</option>
+      </select>
+    </div>
+  );
+};
+
+const MockupCard = ({ mockup, singleImageUpload, onSingleImageUpload, designFiles, onDesignFileChange }: {
   mockup: Mockup;
-  onSingleImageUpload: (mockupId: number, file: File | null) => void;
-  onDesignFileChange: (designAreaId: number, mockupId: number, file: File | null) => void;
   singleImageUpload?: SingleImageUpload;
+  onSingleImageUpload: (mockupId: number, file: File | null, designColor: string) => void;
   designFiles: DesignFileWithPreview[];
+  onDesignFileChange: (designAreaId: number, mockupId: number, file: File | null, designColor: string) => void;
 }) => {
   const [showIndividualUploads, setShowIndividualUploads] = useState(false);
 
   return (
     <div className="rounded-lg border border-stroke bg-white p-4 dark:border-strokedark dark:bg-boxdark">
-      {/* Mockup Header */}
       <div className="flex items-center gap-4 mb-4">
         <div className="relative w-20 h-20 rounded-lg overflow-hidden">
           <Image
@@ -345,19 +363,6 @@ const MockupCard = ({
             fill
             className="object-cover"
           />
-          {mockup.designAreas?.map((area, index) => (
-            <div
-              key={area.id}
-              className="absolute w-6 h-6 -ml-3 -mt-3 flex items-center justify-center bg-primary text-white rounded-full text-sm font-bold shadow-lg"
-              style={{
-                left: `${area.centerX}%`,
-                top: `${area.centerY}%`,
-                transform: `rotate(${area.angle}deg)`,
-              }}
-            >
-              {index + 1}
-            </div>
-          ))}
         </div>
         <div>
           <h4 className="font-medium text-black dark:text-white">
@@ -366,136 +371,133 @@ const MockupCard = ({
           <p className="text-sm text-gray-500">
             {mockup.designAreas?.length} design areas
           </p>
-        </div>
-      </div>
-
-      {/* Upload Options */}
-      <div className="space-y-4">
-        {/* Single Image Upload */}
-        {!showIndividualUploads ? (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <label className="text-sm font-medium text-black dark:text-white">
-                Upload one image for all areas
-              </label>
-              <button
-                onClick={() => setShowIndividualUploads(true)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-primary bg-opacity-10 text-primary rounded-lg hover:bg-opacity-20 transition-all"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <div className="flex items-center gap-1 text-sm text-gray-500">
+            Design Color: {mockup.designColor}
+            {singleImageUpload?.file && ((mockup.designColor === DesignColor.Black && singleImageUpload?.designColor !== DesignColor.Black) ||
+              (mockup.designColor === DesignColor.White && singleImageUpload?.designColor !== DesignColor.White) ||
+              (mockup.designColor === DesignColor.Color && singleImageUpload?.designColor !== DesignColor.Color)) && (
+              <div className="tooltip" title="Warning: Design color does not match mockup color">
+                <svg className="w-4 h-4 text-meta-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span className="text-sm font-medium">Upload individual images</span>
-              </button>
-            </div>
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => onSingleImageUpload(mockup.id, e.target.files?.[0] || null)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              />
-              <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
-                {singleImageUpload?.previewUrl ? (
-                  <div className="relative w-full h-full">
-                    <Image
-                      src={singleImageUpload.previewUrl}
-                      alt="Preview"
-                      fill
-                      className="object-contain"
-                    />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSingleImageUpload(mockup.id, null);
-                      }}
-                      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-sm text-gray-500">Click or drop image here</span>
-                  </>
-                )}
               </div>
-            </div>
+            )}
           </div>
-        ) : (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <label className="text-sm font-medium text-black dark:text-white">
-                Upload individual images
-              </label>
-              <button
-                onClick={() => {
-                  setShowIndividualUploads(false);
-                  mockup.designAreas?.forEach(area => {
-                    onDesignFileChange(area.id, mockup.id, null);
-                  });
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-meta-1 bg-opacity-10 text-meta-1 rounded-lg hover:bg-opacity-20 transition-all"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-sm font-medium">Use single image</span>
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {mockup.designAreas?.map((area, index) => {
-                const designFile = designFiles.find(df => df.designAreaId === area.id && df.mockupId === mockup.id);
-                return (
-                  <div key={area.id} className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => onDesignFileChange(area.id, mockup.id, e.target.files?.[0] || null)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    />
-                    <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
-                      {designFile?.previewUrl ? (
-                        <div className="relative w-full h-full">
-                          <Image
-                            src={designFile.previewUrl}
-                            alt="Preview"
-                            fill
-                            className="object-contain"
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDesignFileChange(area.id, mockup.id, null);
-                            }}
-                            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-primary text-white rounded-full text-sm font-bold">
-                            {index + 1}
-                          </div>
-                          <span className="text-xs text-gray-500">{area.width}x{area.height}px</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+        </div>
+        {mockup.designAreas.length > 1 && (
+          <button
+            onClick={() => setShowIndividualUploads(!showIndividualUploads)}
+            className="ml-auto flex items-center gap-1 px-3 py-1.5 bg-primary bg-opacity-10 text-primary rounded-lg hover:bg-opacity-20 transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-sm font-medium">
+              {showIndividualUploads ? 'Use single design' : 'Upload individual designs'}
+            </span>
+          </button>
         )}
       </div>
+
+      {showIndividualUploads ? (
+        // Design Area Based Upload
+        <div className="grid grid-cols-2 gap-4">
+          {mockup.designAreas.map((area, index) => {
+            const designFile = designFiles.find(df => df.designAreaId === area.id && df.mockupId === mockup.id);
+            return (
+              <div key={area.id} className="space-y-4">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      const currentColor = designFile?.designColor || DesignColor.Color;
+                      onDesignFileChange(area.id, mockup.id, file, currentColor);
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
+                    {designFile?.previewUrl ? (
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={designFile.previewUrl}
+                          alt="Preview"
+                          fill
+                          className="object-contain"
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDesignFileChange(area.id, mockup.id, null, designFile.designColor);
+                          }}
+                          className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-primary text-white rounded-full text-sm font-bold">
+                          {index + 1}
+                        </div>
+                        <span className="text-xs text-gray-500">{area.width}x{area.height}px</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {designFile?.designFile && (
+                  <div>
+                    <ColorSelect
+                      value={designFile.designColor}
+                      onChange={(color) => onDesignFileChange(area.id, mockup.id, designFile.designFile, color)}
+                      mockupColor={mockup.designColor}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        // Single Design Upload
+        <>
+          {/* Design Preview */}
+          {singleImageUpload?.previewUrl && (
+            <div className="relative h-[200px] rounded-lg overflow-hidden bg-black/5">
+              <Image
+                src={singleImageUpload.previewUrl}
+                alt="Design Preview"
+                fill
+                className="object-contain"
+              />
+              <button
+                onClick={() => onSingleImageUpload(mockup.id, null, singleImageUpload.designColor)}
+                className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Color Selection */}
+          <div className="mt-4">
+            <ColorSelect
+              value={singleImageUpload?.designColor || mockup.designColor || DesignColor.Color}
+              onChange={(color) => {
+                if (singleImageUpload?.file) {
+                  onSingleImageUpload(mockup.id, singleImageUpload.file, color);
+                }
+              }}
+              mockupColor={mockup.designColor}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -580,7 +582,7 @@ const GeneratePage = () => {
     }
   };
 
-  const handleFileChange = (designAreaId: number, mockupId: number, file: File | null) => {
+  const handleFileChange = (designAreaId: number, mockupId: number, file: File | null, designColor: string) => {
     setDesignFiles(prev => {
       // Clean up old preview URL if exists
       const existingFile = prev.find(df => df.designAreaId === designAreaId && df.mockupId === mockupId);
@@ -594,16 +596,16 @@ const GeneratePage = () => {
       if (existingFile) {
         return prev.map(df =>
           df.designAreaId === designAreaId && df.mockupId === mockupId
-            ? { ...df, designFile: file, previewUrl }
+            ? { ...df, designFile: file, previewUrl, designColor }
             : df
         );
       }
-      return [...prev, { designAreaId, mockupId, designFile: file, previewUrl }];
+      return [...prev, { designAreaId, mockupId, designFile: file, previewUrl, designColor }];
     });
   };
 
-  // Add function to handle single image upload
-  const handleSingleImageUpload = (mockupId: number, file: File | null) => {
+  // Update single image upload handler
+  const handleSingleImageUpload = (mockupId: number, file: File | null, designColor: string) => {
     setSingleImageUploads(prev => {
       // Clean up old preview URL if exists
       const existingUpload = prev.find(u => u.mockupId === mockupId);
@@ -617,11 +619,11 @@ const GeneratePage = () => {
       if (existingUpload) {
         return prev.map(u =>
           u.mockupId === mockupId
-            ? { ...u, file, previewUrl }
+            ? { ...u, file, previewUrl, designColor }
             : u
         );
       }
-      return [...prev, { mockupId, file, previewUrl }];
+      return [...prev, { mockupId, file, previewUrl, designColor }];
     });
 
     // Clear individual design area uploads for this mockup
@@ -699,47 +701,20 @@ const GeneratePage = () => {
         }
       });
 
-      // Log mockup counts for debugging
-      console.log('Gönderilen mockup sayısı:', mockupsWithDesigns);
-      console.log('Atlanan mockuplar:', skippedMockups);
-
-      if (skippedMockups.length > 0) {
-        const shouldProceed = window.confirm(
-          `${skippedMockups.length} mockup için gerekli tasarımlar eksik olduğundan bu mockuplar atlanacak. Devam etmek istiyor musunuz?`
-        );
-        if (!shouldProceed) {
-          setIsGenerating(false);
-          return;
-        }
-      }
-
-      // Add design files and their corresponding area IDs
+      // Add design files and their corresponding area IDs and colors
       mocksToShow.forEach(mockup => {
-        console.log(`Processing mockup ${mockup.id}:`, {
-          name: mockup.name,
-          designAreasCount: mockup.designAreas.length,
-          hasSingleUpload: singleImageUploads.some(u => u.mockupId === mockup.id && u.file),
-          designFilesCount: designFiles.filter(df => df.mockupId === mockup.id && df.designFile).length,
-          designAreas: mockup.designAreas.map(area => ({
-            areaId: area.id,
-            hasDesign: singleImageUploads.some(u => u.mockupId === mockup.id && u.file) ||
-                      designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
-          }))
-        });
-
         const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
         
         if (singleUpload?.file) {
-          console.log(`Mockup ${mockup.id}: Using single upload for all design areas`);
           // Tek resim yüklemesi varsa, tüm design area'lar için onu kullan
           mockup.designAreas.forEach(area => {
             formData.append('designAreaIds', area.id.toString());
+            formData.append('designColors', singleUpload.designColor);
             if (singleUpload.file) {
               formData.append('designFiles', singleUpload.file);
             }
           });
         } else {
-          console.log(`Mockup ${mockup.id}: Using individual design area uploads`);
           // Design area bazlı yüklemeleri kontrol et
           mockup.designAreas.forEach(area => {
             const designFile = designFiles.find(df => 
@@ -749,33 +724,20 @@ const GeneratePage = () => {
             );
             if (designFile?.designFile) {
               formData.append('designAreaIds', area.id.toString());
+              formData.append('designColors', designFile.designColor);
               formData.append('designFiles', designFile.designFile);
             }
           });
         }
       });
 
-      // Log final formData contents
+      // Log final formData contents for debugging
       console.log('FormData contents:');
       console.log('mockupIds:', Array.from(formData.getAll('mockupIds')));
-      console.log('designAreaIds count:', formData.getAll('designAreaIds').length);
+      console.log('designAreaIds:', Array.from(formData.getAll('designAreaIds')));
+      console.log('designColors:', Array.from(formData.getAll('designColors')));
       console.log('designFiles count:', formData.getAll('designFiles').length);
 
-      // Log design area mappings
-      const designAreaMappings = mocksToShow.map(mockup => {
-        const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
-        return {
-          mockupId: mockup.id,
-          mockupName: mockup.name,
-          designAreas: mockup.designAreas.map(area => ({
-            areaId: area.id,
-            hasDesign: singleUpload?.file != null || 
-                      designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
-          }))
-        };
-      });
-      console.log('Design Area Mappings:', designAreaMappings);
-      
       // Token'ı her request öncesi yeniden al ve header'a ekle
       const currentToken = authService.getToken();
       if (!currentToken) {
@@ -783,13 +745,6 @@ const GeneratePage = () => {
       }
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      
-      // Log request details
-      console.log('Sending request to:', `${API_URL}/api/Mockup/generate`);
-      console.log('Request formData details:');
-      console.log('- mockupIds:', Array.from(formData.getAll('mockupIds')).join(', '));
-      console.log('- designAreaIds:', Array.from(formData.getAll('designAreaIds')).join(', '));
-      console.log('- Number of files:', formData.getAll('designFiles').length);
       
       const response = await axios.post(
         `${API_URL}/api/Mockup/generate`,
@@ -850,6 +805,24 @@ const GeneratePage = () => {
   const selectedList = lists.find(list => list.id === selectedListId);
   const mocksToShow = selectedListId && selectedList?.mockups ? selectedList.mockups : selectedMockups;
 
+  // Add new handler for bulk uploads
+  const handleBulkUpload = (file: File | null, designColor: string) => {
+    if (!file) return;
+
+    // Apply to mockups based on design color
+    mocksToShow.forEach(mockup => {
+      // Apply designs to mockups with matching colors
+      const shouldApply = 
+        designColor === DesignColor.Color || // Color designs can go to any mockup
+        (designColor === DesignColor.White && mockup.designColor === DesignColor.White) ||
+        (designColor === DesignColor.Black && mockup.designColor === DesignColor.Black);
+
+      if (shouldApply) {
+        handleSingleImageUpload(mockup.id, file, designColor);
+      }
+    });
+  };
+
   return (
     <DefaultLayout>
       <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
@@ -887,13 +860,12 @@ const GeneratePage = () => {
 
                 <div>
                   <label className="mb-2.5 block text-black dark:text-white font-medium">
-                    Favori Listelerden Seç
+                    Select from Favorites
                   </label>
                   <select
                     value={selectedListId || ''}
                     onChange={(e) => {
                       const value = e.target.value ? Number(e.target.value) : null;
-                      console.log('Selected list ID:', value); // Debug log
                       setSelectedListId(value);
                       if (value) {
                         setSelectedMockups([]);
@@ -901,89 +873,105 @@ const GeneratePage = () => {
                     }}
                     className="w-full h-[120px] rounded-lg border-2 border-stroke bg-transparent px-5 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
                   >
-                    <option value="">Favori liste seçin</option>
-                    {lists.length > 0 ? (
-                      lists.map(list => (
-                        <option key={list.id} value={list.id}>
-                          {list.name} ({list.mockups?.length || 0} mockup)
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>Favori liste bulunamadı</option>
-                    )}
+                    <option value="">Select a favorite list</option>
+                    {lists.map(list => (
+                      <option key={list.id} value={list.id}>
+                        {list.name} ({list.mockups?.length || 0} mockups)
+                      </option>
+                    ))}
                   </select>
-                  {lists.length === 0 && (
-                    <p className="mt-2 text-sm text-meta-1">
-                      Henüz favori listeniz bulunmuyor.
-                    </p>
-                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Upload Designs */}
           {mocksToShow.length > 0 && (
-            <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-              <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
-                <h3 className="font-medium text-black dark:text-white">
-                  Tasarım Yükle
-                </h3>
-              </div>
-              <div className="p-6.5">
-                {/* Toplu Tasarım Yükleme Alanı */}
-                <div className="mb-6">
-                  <div className="relative">
-                    <label className="mb-2.5 block text-black dark:text-white font-medium">
-                      Tüm Design Area'lar İçin Tek Tasarım
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        if (file) {
-                          mocksToShow.forEach(mockup => {
-                            handleSingleImageUpload(mockup.id, file);
-                          });
-                        }
-                      }}
-                      className="w-full cursor-pointer rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:px-5 file:py-3 file:hover:bg-primary file:hover:bg-opacity-10 focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white"
-                    />
+            <>
+              {/* Bulk Upload Section */}
+              <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+                <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
+                  <h3 className="font-medium text-black dark:text-white">
+                    Bulk Upload Designs
+                  </h3>
+                </div>
+                <div className="p-6.5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Black Design Bulk Upload */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-black dark:text-white">
+                        Black Design
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleBulkUpload(e.target.files?.[0] || null, DesignColor.Black)}
+                          className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* White Design Bulk Upload */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-black dark:text-white">
+                        White Design
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleBulkUpload(e.target.files?.[0] || null, DesignColor.White)}
+                          className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Color Design Bulk Upload */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-black dark:text-white">
+                        Color Design
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleBulkUpload(e.target.files?.[0] || null, DesignColor.Color)}
+                          className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <p className="mt-2 text-sm text-gray-500">
-                    Yüklediğiniz tasarım tüm design area'lara uygulanacaktır.
-                  </p>
                 </div>
-
-                {/* Mockup Kartları */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {mocksToShow.map(mockup => (
-                    <MockupCard
-                      key={mockup.id}
-                      mockup={mockup}
-                      onSingleImageUpload={handleSingleImageUpload}
-                      onDesignFileChange={handleFileChange}
-                      singleImageUpload={singleImageUploads.find(u => u.mockupId === mockup.id)}
-                      designFiles={designFiles}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || (!designFiles.some(df => df.designFile) && !singleImageUploads.some(u => u.file))}
-                  className="mt-6 flex w-full justify-center rounded-lg bg-primary p-4 font-medium text-gray hover:bg-opacity-90 disabled:opacity-50"
-                >
-                  {isGenerating ? (
-                    <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : 'Mockup Oluştur'}
-                </button>
               </div>
-            </div>
+
+              {/* Mockup Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {mocksToShow.map((mockup) => (
+                  <MockupCard
+                    key={mockup.id}
+                    mockup={mockup}
+                    singleImageUpload={singleImageUploads.find(u => u.mockupId === mockup.id)}
+                    onSingleImageUpload={handleSingleImageUpload}
+                    designFiles={designFiles}
+                    onDesignFileChange={handleFileChange}
+                  />
+                ))}
+              </div>
+
+              {/* Generate Button */}
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating || !singleImageUploads.some(u => u.file)}
+                className="mt-6 flex w-full justify-center rounded-lg bg-primary p-4 font-medium text-gray hover:bg-opacity-90 disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : 'Generate Mockups'}
+              </button>
+            </>
           )}
         </div>
       </div>
