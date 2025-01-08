@@ -660,6 +660,10 @@ const GeneratePage = () => {
         return;
       }
 
+      // Debug için mockup sayılarını loglayalım
+      console.log('Toplam seçili mockup sayısı:', mocksToShow.length);
+      let mockupsWithDesigns = 0;
+
       const hasAnyDesignFile = mocksToShow.some(mockup => {
         // Tek resim yükleme kontrolü
         const hasSingleUpload = singleImageUploads.some(u => u.mockupId === mockup.id && u.file);
@@ -678,25 +682,64 @@ const GeneratePage = () => {
       setIsGenerating(true);
 
       const formData = new FormData();
+      const skippedMockups: number[] = [];
       
-      // Add mockupIds
+      // Add mockupIds and track which ones are actually being sent
       mocksToShow.forEach(mockup => {
-        formData.append('mockupIds', mockup.id.toString());
+        const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
+        const hasAllDesignAreas = mockup.designAreas.every(area =>
+          designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
+        );
+
+        if (singleUpload?.file || hasAllDesignAreas) {
+          formData.append('mockupIds', mockup.id.toString());
+          mockupsWithDesigns++;
+        } else {
+          skippedMockups.push(mockup.id);
+        }
       });
+
+      // Log mockup counts for debugging
+      console.log('Gönderilen mockup sayısı:', mockupsWithDesigns);
+      console.log('Atlanan mockuplar:', skippedMockups);
+
+      if (skippedMockups.length > 0) {
+        const shouldProceed = window.confirm(
+          `${skippedMockups.length} mockup için gerekli tasarımlar eksik olduğundan bu mockuplar atlanacak. Devam etmek istiyor musunuz?`
+        );
+        if (!shouldProceed) {
+          setIsGenerating(false);
+          return;
+        }
+      }
 
       // Add design files and their corresponding area IDs
       mocksToShow.forEach(mockup => {
+        console.log(`Processing mockup ${mockup.id}:`, {
+          name: mockup.name,
+          designAreasCount: mockup.designAreas.length,
+          hasSingleUpload: singleImageUploads.some(u => u.mockupId === mockup.id && u.file),
+          designFilesCount: designFiles.filter(df => df.mockupId === mockup.id && df.designFile).length,
+          designAreas: mockup.designAreas.map(area => ({
+            areaId: area.id,
+            hasDesign: singleImageUploads.some(u => u.mockupId === mockup.id && u.file) ||
+                      designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
+          }))
+        });
+
         const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
         
         if (singleUpload?.file) {
+          console.log(`Mockup ${mockup.id}: Using single upload for all design areas`);
           // Tek resim yüklemesi varsa, tüm design area'lar için onu kullan
           mockup.designAreas.forEach(area => {
             formData.append('designAreaIds', area.id.toString());
-            if (singleUpload.file) { // null check
+            if (singleUpload.file) {
               formData.append('designFiles', singleUpload.file);
             }
           });
         } else {
+          console.log(`Mockup ${mockup.id}: Using individual design area uploads`);
           // Design area bazlı yüklemeleri kontrol et
           mockup.designAreas.forEach(area => {
             const designFile = designFiles.find(df => 
@@ -712,6 +755,27 @@ const GeneratePage = () => {
         }
       });
 
+      // Log final formData contents
+      console.log('FormData contents:');
+      console.log('mockupIds:', Array.from(formData.getAll('mockupIds')));
+      console.log('designAreaIds count:', formData.getAll('designAreaIds').length);
+      console.log('designFiles count:', formData.getAll('designFiles').length);
+
+      // Log design area mappings
+      const designAreaMappings = mocksToShow.map(mockup => {
+        const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
+        return {
+          mockupId: mockup.id,
+          mockupName: mockup.name,
+          designAreas: mockup.designAreas.map(area => ({
+            areaId: area.id,
+            hasDesign: singleUpload?.file != null || 
+                      designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
+          }))
+        };
+      });
+      console.log('Design Area Mappings:', designAreaMappings);
+      
       // Token'ı her request öncesi yeniden al ve header'a ekle
       const currentToken = authService.getToken();
       if (!currentToken) {
@@ -719,6 +783,13 @@ const GeneratePage = () => {
       }
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+      
+      // Log request details
+      console.log('Sending request to:', `${API_URL}/api/Mockup/generate`);
+      console.log('Request formData details:');
+      console.log('- mockupIds:', Array.from(formData.getAll('mockupIds')).join(', '));
+      console.log('- designAreaIds:', Array.from(formData.getAll('designAreaIds')).join(', '));
+      console.log('- Number of files:', formData.getAll('designFiles').length);
       
       const response = await axios.post(
         `${API_URL}/api/Mockup/generate`,
