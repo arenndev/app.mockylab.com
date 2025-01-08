@@ -79,6 +79,14 @@ interface LoaderProps {
   className?: string;
 }
 
+interface AreaState {
+  centerX: number;
+  centerY: number;
+  width: number;
+  height: number;
+  angle: number;
+}
+
 const Alert = ({ message, type }: { message: string; type: string }) => {
   let alertStyle = '';
   let iconBg = '';
@@ -185,7 +193,138 @@ const EditMockupPage = () => {
 
   const [isNewAreaPending, setIsNewAreaPending] = useState(false);
 
+  const [areaStates, setAreaStates] = useState<Map<number, AreaState>>(new Map());
+
   const router = useRouter();
+
+  // Alanların mevcut durumunu kaydet
+  const saveCurrentAreaStates = useCallback(() => {
+    if (!canvas || !originalImageSize) return;
+
+    const canvasImage = canvas.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
+    if (!canvasImage) return;
+
+    const imageScale = originalImageSize.width / (canvasImage.width! * canvasImage.scaleX!);
+    const groups = canvas.getObjects().filter(obj => obj instanceof fabric.Group);
+    
+    const newStates = new Map<number, AreaState>();
+    
+    groups.forEach(group => {
+      const rect = group.getObjects().find(obj => obj instanceof fabric.Rect) as DesignRect;
+      if (!rect.designAreaId) return;
+
+      const groupCenter = group.getCenterPoint();
+      const relativeX = groupCenter.x - canvasImage.left!;
+      const relativeY = groupCenter.y - canvasImage.top!;
+
+      newStates.set(rect.designAreaId, {
+        centerX: Math.round(relativeX * imageScale),
+        centerY: Math.round(relativeY * imageScale),
+        width: Math.round(group.width! * imageScale),
+        height: Math.round(group.height! * imageScale),
+        angle: group.angle || 0
+      });
+    });
+
+    setAreaStates(newStates);
+  }, [canvas, originalImageSize]);
+
+  // Değişiklikleri kontrol et
+  const checkForChanges = useCallback(() => {
+    if (!canvas || !originalImageSize) return false;
+
+    const canvasImage = canvas.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
+    if (!canvasImage) return false;
+
+    const imageScale = originalImageSize.width / (canvasImage.width! * canvasImage.scaleX!);
+    const groups = canvas.getObjects().filter(obj => obj instanceof fabric.Group);
+    
+    let hasChanges = false;
+    
+    groups.forEach(group => {
+      const rect = group.getObjects().find(obj => obj instanceof fabric.Rect) as DesignRect;
+      if (!rect.designAreaId) return;
+
+      const groupCenter = group.getCenterPoint();
+      const relativeX = groupCenter.x - canvasImage.left!;
+      const relativeY = groupCenter.y - canvasImage.top!;
+
+      const currentState = areaStates.get(rect.designAreaId);
+      if (!currentState) {
+        hasChanges = true;
+        return;
+      }
+
+      // Scale'li boyutları hesapla
+      const scaledWidth = group.width! * (group.scaleX || 1);
+      const scaledHeight = group.height! * (group.scaleY || 1);
+
+      const newCenterX = Math.round(relativeX * imageScale);
+      const newCenterY = Math.round(relativeY * imageScale);
+      const newWidth = Math.round(scaledWidth * imageScale);
+      const newHeight = Math.round(scaledHeight * imageScale);
+      const newAngle = group.angle || 0;
+
+      // Hassas değişiklik kontrolü
+      const hasPositionChange = Math.abs(currentState.centerX - newCenterX) > 1 || 
+                               Math.abs(currentState.centerY - newCenterY) > 1;
+      const hasSizeChange = Math.abs(currentState.width - newWidth) > 1 || 
+                           Math.abs(currentState.height - newHeight) > 1;
+      const hasAngleChange = Math.abs(currentState.angle - newAngle) > 0.1;
+
+      if (hasPositionChange || hasSizeChange || hasAngleChange) {
+        hasChanges = true;
+      }
+    });
+
+    return hasChanges;
+  }, [canvas, originalImageSize, areaStates]);
+
+  // Canvas event handler'ını güncelle
+  useEffect(() => {
+    if (canvas) {
+      const handleObjectModification = (e: any) => {
+        const target = e.target;
+        if (target instanceof fabric.Group) {
+          const hasChanges = checkForChanges();
+          setHasUnsavedAreaChanges(hasChanges);
+        }
+      };
+
+      type CanvasEventName = 'object:modified' | 'object:scaling' | 'object:rotating' | 'object:moving' | 'object:skewing';
+      const events: CanvasEventName[] = [
+        'object:modified',
+        'object:scaling',
+        'object:rotating',
+        'object:moving',
+        'object:skewing'
+      ];
+
+      events.forEach(eventName => {
+        canvas.on(eventName, handleObjectModification);
+      });
+
+      canvas.on('object:added', (e: any) => {
+        if (e.target instanceof fabric.Group && !isNewAreaPending) {
+          setHasUnsavedAreaChanges(true);
+        }
+      });
+
+      canvas.on('object:removed', (e: any) => {
+        if (e.target instanceof fabric.Group && !isDeletingArea) {
+          setHasUnsavedAreaChanges(true);
+        }
+      });
+
+      return () => {
+        events.forEach(eventName => {
+          canvas.off(eventName, handleObjectModification);
+        });
+        canvas.off('object:added');
+        canvas.off('object:removed');
+      };
+    }
+  }, [canvas, isNewAreaPending, isDeletingArea, checkForChanges]);
 
   const fetchMockupData = useCallback(async (mockupId: string) => {
     setIsLoading(true);
@@ -446,22 +585,30 @@ const EditMockupPage = () => {
       // Görsel ölçeğini hesapla
       const imageScale = originalImageSize.width / (canvasImage.width! * canvasImage.scaleX!);
 
-      for (const group of groups) {
+      console.log('Original Image Size:', originalImageSize);
+      console.log('Canvas Image Size:', { width: canvasImage.width, height: canvasImage.height });
+      console.log('Image Scale:', imageScale);
+
+      const updatePromises = groups.map(async (group) => {
         const rect = group.getObjects().find(obj => obj instanceof fabric.Rect) as DesignRect;
         
         if (!rect.designAreaId) {
           console.warn('Design area has no ID:', rect);
-          continue;
+          return;
         }
 
         const groupCenter = group.getCenterPoint();
         const relativeX = groupCenter.x - canvasImage.left!;
         const relativeY = groupCenter.y - canvasImage.top!;
 
+        // Scale'li boyutları hesapla
+        const scaledWidth = group.width! * (group.scaleX || 1);
+        const scaledHeight = group.height! * (group.scaleY || 1);
+
         const originalCenterX = Math.round(relativeX * imageScale);
         const originalCenterY = Math.round(relativeY * imageScale);
-        const originalWidth = Math.round(group.width! * imageScale);
-        const originalHeight = Math.round(group.height! * imageScale);
+        const originalWidth = Math.round(scaledWidth * imageScale);
+        const originalHeight = Math.round(scaledHeight * imageScale);
 
         const areaData = {
           name: rect.designAreaName || 'Design Area',
@@ -474,6 +621,18 @@ const EditMockupPage = () => {
           angle: group.angle || 0
         };
 
+        console.log('Sending area data for ID', rect.designAreaId, ':', areaData);
+        console.log('Group dimensions:', {
+          width: group.width,
+          height: group.height,
+          scaleX: group.scaleX,
+          scaleY: group.scaleY,
+          scaledWidth,
+          scaledHeight,
+          finalWidth: originalWidth,
+          finalHeight: originalHeight
+        });
+
         const response = await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas/${rect.designAreaId}`, {
           method: 'PUT',
           headers: {
@@ -483,12 +642,19 @@ const EditMockupPage = () => {
           body: JSON.stringify(areaData)
         });
 
-        const responseText = await response.text();
-        if (!response.ok) {
-          throw new Error(`Failed to update design area ${rect.designAreaId}: ${responseText}`);
-        }
-      }
+        const responseData = await response.text();
+        console.log('Response from backend:', responseData);
 
+        if (!response.ok) {
+          throw new Error(`Failed to update design area ${rect.designAreaId}: ${responseData}`);
+        }
+      });
+
+      await Promise.all(updatePromises);
+      
+      // Başarılı kayıttan sonra yeni durumu kaydet
+      saveCurrentAreaStates();
+      
       setHasUnsavedAreaChanges(false);
       setAlertState({
         show: true,
@@ -754,39 +920,6 @@ const EditMockupPage = () => {
       setIsLoading(false);
     }
   };
-
-  // Canvas üzerinde değişiklik olduğunda
-  useEffect(() => {
-    if (canvas) {
-      canvas.on('object:modified', (e) => {
-        const target = e.target;
-        if (target instanceof fabric.Group) {
-          setHasUnsavedAreaChanges(true);
-        }
-      });
-
-      canvas.on('object:scaling', (e) => {
-        const target = e.target;
-        if (target instanceof fabric.Group) {
-          setHasUnsavedAreaChanges(true);
-        }
-      });
-
-      canvas.on('object:rotating', (e) => {
-        const target = e.target;
-        if (target instanceof fabric.Group) {
-          setHasUnsavedAreaChanges(true);
-        }
-      });
-
-      canvas.on('object:moving', (e) => {
-        const target = e.target;
-        if (target instanceof fabric.Group) {
-          setHasUnsavedAreaChanges(true);
-        }
-      });
-    }
-  }, [canvas]);
 
   // Mockup verilerini yüklemek için useEffect
   useEffect(() => {

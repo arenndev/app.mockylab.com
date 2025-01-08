@@ -530,7 +530,10 @@ const GeneratePage = () => {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       
+      console.log('Fetching lists for user:', user.userId); // Debug log
       const response = await axios.get(`${API_URL}/api/Favorite/${user.userId}/lists`);
+      console.log('Lists response:', response.data); // Debug log
+
       let newLists: FavoriteList[] = [];
       
       if (Array.isArray(response.data)) {
@@ -539,23 +542,22 @@ const GeneratePage = () => {
         newLists = response.data.data;
       }
 
-      // If mockups in favorite lists don't have preview paths, fetch them from all mockups
+      // Mockup bilgilerini güncelle
       if (mockups.length > 0) {
         newLists = newLists.map(list => ({
           ...list,
           mockups: list.mockups.map(mockup => {
-            if (!mockup.backgroundImagePreviewPath) {
-              const fullMockup = mockups.find(m => m.id === mockup.id);
-              return {
-                ...mockup,
-                backgroundImagePreviewPath: fullMockup?.backgroundImagePreviewPath || ''
-              };
-            }
-            return mockup;
+            const fullMockup = mockups.find(m => m.id === mockup.id);
+            return {
+              ...mockup,
+              ...fullMockup, // Tüm mockup bilgilerini birleştir
+              backgroundImagePreviewPath: fullMockup?.backgroundImagePreviewPath || mockup.backgroundImagePreviewPath || ''
+            };
           })
         }));
       }
 
+      console.log('Processed lists:', newLists); // Debug log
       setLists(newLists);
     } catch (error) {
       console.error("Error fetching lists:", error);
@@ -644,45 +646,78 @@ const GeneratePage = () => {
 
   const handleGenerate = async () => {
     try {
-      setIsGenerating(true);
+      // Token kontrolü
       const token = authService.getToken();
-      if (!token) return;
+      if (!token) {
+        alert("Oturum süreniz dolmuş. Lütfen yeniden giriş yapın.");
+        router.push('/login');
+        return;
+      }
+
+      // Kontrolleri yapalım
+      if (!mocksToShow.length) {
+        alert("Lütfen mockup seçin veya bir liste seçin.");
+        return;
+      }
+
+      const hasAnyDesignFile = mocksToShow.some(mockup => {
+        // Tek resim yükleme kontrolü
+        const hasSingleUpload = singleImageUploads.some(u => u.mockupId === mockup.id && u.file);
+        // Design area bazlı yükleme kontrolü
+        const hasDesignAreaUploads = mockup.designAreas.every(area => 
+          designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
+        );
+        return hasSingleUpload || hasDesignAreaUploads;
+      });
+
+      if (!hasAnyDesignFile) {
+        alert("Lütfen en az bir tasarım yükleyin. Her mockup için ya tek bir tasarım ya da tüm design area'lar için ayrı tasarımlar yüklemelisiniz.");
+        return;
+      }
+
+      setIsGenerating(true);
 
       const formData = new FormData();
       
-      const mocksToGenerate = selectedListId 
-        ? lists.find(list => list.id === selectedListId)?.mockups || []
-        : selectedMockups;
-
       // Add mockupIds
-      mocksToGenerate.forEach(mockup => {
+      mocksToShow.forEach(mockup => {
         formData.append('mockupIds', mockup.id.toString());
       });
 
       // Add design files and their corresponding area IDs
-      mocksToGenerate.forEach(mockup => {
+      mocksToShow.forEach(mockup => {
         const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
         
         if (singleUpload?.file) {
-          // If there's a single image upload, use it for all design areas
+          // Tek resim yüklemesi varsa, tüm design area'lar için onu kullan
           mockup.designAreas.forEach(area => {
             formData.append('designAreaIds', area.id.toString());
-            if (singleUpload.file) {
+            if (singleUpload.file) { // null check
               formData.append('designFiles', singleUpload.file);
             }
           });
         } else {
-          // Otherwise, use individual design area uploads
-          designFiles.forEach(design => {
-            if (design.designFile && design.mockupId === mockup.id) {
-              formData.append('designAreaIds', design.designAreaId.toString());
-              formData.append('designFiles', design.designFile);
+          // Design area bazlı yüklemeleri kontrol et
+          mockup.designAreas.forEach(area => {
+            const designFile = designFiles.find(df => 
+              df.designAreaId === area.id && 
+              df.mockupId === mockup.id && 
+              df.designFile
+            );
+            if (designFile?.designFile) {
+              formData.append('designAreaIds', area.id.toString());
+              formData.append('designFiles', designFile.designFile);
             }
           });
         }
       });
 
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // Token'ı her request öncesi yeniden al ve header'a ekle
+      const currentToken = authService.getToken();
+      if (!currentToken) {
+        throw new Error("Token not found");
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       
       const response = await axios.post(
@@ -691,7 +726,8 @@ const GeneratePage = () => {
         {
           responseType: 'blob',
           headers: {
-            'Content-Type': 'multipart/form-data'
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${currentToken}`
           }
         }
       );
@@ -707,10 +743,15 @@ const GeneratePage = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error generating mockups:", error);
-      if (axios.isAxiosError(error) && error.response) {
-        const responseData = await error.response.data.text();
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          alert("Oturum süreniz dolmuş. Lütfen yeniden giriş yapın.");
+          router.push('/login');
+          return;
+        }
+        const responseData = await error.response?.data?.text?.();
         console.error("Server error details:", responseData);
-        alert("Error generating mockups. Please make sure you have selected mockups and uploaded design files.");
+        alert("Mockup oluşturulurken bir hata oluştu. Lütfen tüm design area'lar için tasarım yüklediğinizden emin olun.");
       }
     } finally {
       setIsGenerating(false);
@@ -721,20 +762,22 @@ const GeneratePage = () => {
     const token = authService.getToken();
     if (token) {
       fetchMockups();
+      fetchLists(); // İlk yüklemede her ikisini de çağır
     } else {
       router.push('/login');
     }
   }, []);
 
-  // Add new useEffect to fetch lists when mockups change
+  // Mockups değiştiğinde listeleri güncelle
   useEffect(() => {
-    if (mockups.length > 0) {
+    if (mockups.length > 0 && lists.length > 0) {
       fetchLists();
     }
   }, [mockups]);
 
+  // Favori liste ve mockup seçimi kontrolü
   const selectedList = lists.find(list => list.id === selectedListId);
-  const mocksToShow = selectedListId ? selectedList?.mockups || [] : selectedMockups;
+  const mocksToShow = selectedListId && selectedList?.mockups ? selectedList.mockups : selectedMockups;
 
   return (
     <DefaultLayout>
@@ -773,12 +816,13 @@ const GeneratePage = () => {
 
                 <div>
                   <label className="mb-2.5 block text-black dark:text-white font-medium">
-                    Or Choose from Favorite Lists
+                    Favori Listelerden Seç
                   </label>
                   <select
                     value={selectedListId || ''}
                     onChange={(e) => {
                       const value = e.target.value ? Number(e.target.value) : null;
+                      console.log('Selected list ID:', value); // Debug log
                       setSelectedListId(value);
                       if (value) {
                         setSelectedMockups([]);
@@ -786,13 +830,22 @@ const GeneratePage = () => {
                     }}
                     className="w-full h-[120px] rounded-lg border-2 border-stroke bg-transparent px-5 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
                   >
-                    <option value="">Select a favorite list</option>
-                    {lists.map(list => (
-                      <option key={list.id} value={list.id}>
-                        {list.name} ({list.mockups?.length || 0} mockups)
-                      </option>
-                    ))}
+                    <option value="">Favori liste seçin</option>
+                    {lists.length > 0 ? (
+                      lists.map(list => (
+                        <option key={list.id} value={list.id}>
+                          {list.name} ({list.mockups?.length || 0} mockup)
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>Favori liste bulunamadı</option>
+                    )}
                   </select>
+                  {lists.length === 0 && (
+                    <p className="mt-2 text-sm text-meta-1">
+                      Henüz favori listeniz bulunmuyor.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -803,10 +856,36 @@ const GeneratePage = () => {
             <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
               <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
                 <h3 className="font-medium text-black dark:text-white">
-                  Upload Design Files
+                  Tasarım Yükle
                 </h3>
               </div>
               <div className="p-6.5">
+                {/* Toplu Tasarım Yükleme Alanı */}
+                <div className="mb-6">
+                  <div className="relative">
+                    <label className="mb-2.5 block text-black dark:text-white font-medium">
+                      Tüm Design Area'lar İçin Tek Tasarım
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        if (file) {
+                          mocksToShow.forEach(mockup => {
+                            handleSingleImageUpload(mockup.id, file);
+                          });
+                        }
+                      }}
+                      className="w-full cursor-pointer rounded-lg border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:px-5 file:py-3 file:hover:bg-primary file:hover:bg-opacity-10 focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white"
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Yüklediğiniz tasarım tüm design area'lara uygulanacaktır.
+                  </p>
+                </div>
+
+                {/* Mockup Kartları */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {mocksToShow.map(mockup => (
                     <MockupCard
@@ -830,7 +909,7 @@ const GeneratePage = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                  ) : 'Generate Mockups'}
+                  ) : 'Mockup Oluştur'}
                 </button>
               </div>
             </div>
