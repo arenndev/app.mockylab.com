@@ -339,7 +339,13 @@ const AddMockupPage = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          throw new Error(`Failed to create mockup: ${errorText}`);
+        }
         throw new Error(errorData.message || 'Failed to create mockup');
       }
 
@@ -390,7 +396,7 @@ const AddMockupPage = () => {
               angle: group.angle || 0
             };
 
-            await fetch(`${API_URL}/api/mockups/${result.data.id}/design-areas`, {
+            const areaResponse = await fetch(`${API_URL}/api/mockups/${result.data.id}/design-areas`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -398,6 +404,16 @@ const AddMockupPage = () => {
               },
               body: JSON.stringify(designArea)
             });
+
+            if (!areaResponse.ok) {
+              const errorText = await areaResponse.text();
+              throw new Error(`Failed to create design area: ${errorText}`);
+            }
+
+            const areaResult = await areaResponse.json();
+            if (!areaResult.success) {
+              throw new Error(areaResult.message || 'Failed to create design area');
+            }
           }
         }
 
