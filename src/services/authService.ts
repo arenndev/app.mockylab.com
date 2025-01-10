@@ -3,22 +3,13 @@ import Cookies from 'js-cookie';
 
 const API_URL = 'http://localhost:5002/api';
 
-// Add default headers
+// Add default headers and axios configuration
 axios.defaults.headers.post['Content-Type'] = 'application/json';
 axios.defaults.headers.post['Accept'] = 'application/json';
 
-export function parseJwt(token: string) {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-    return JSON.parse(jsonPayload);
-  } catch (error) {
-    console.error('Error parsing JWT:', error);
-    return null;
-  }
+// Ignore HTTPS certificate errors in development
+if (process.env.NODE_ENV === 'development') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 }
 
 export const authService = {
