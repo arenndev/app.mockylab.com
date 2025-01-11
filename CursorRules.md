@@ -30,18 +30,25 @@
 - API key stored in User entity
 - Shop ID stored in User entity
 - Settings managed through dedicated Printify Settings page
-- Printify-related operations handled through UserController
+- Blueprint management through dedicated pages:
+  - Blueprint listing page
+  - Blueprint detail page with variant management
+  - Automatic variant synchronization
+  - Variant data stored in JSONB format
+- Printify-related operations handled through PrintifyController
 
 ### 6. Navigation
 - Sidebar contains only relevant menu items:
   - Mockups (with submenu)
   - Design Create
   - Printify Settings
+  - My Blueprints
 
 ### 7. Error Handling
 - Proper error messages for API failures
 - User-friendly error displays
 - Redirect to login when authentication fails
+- Specific error handling for Printify API issues
 
 ### 8. Code Style
 - Use TypeScript for frontend
@@ -53,11 +60,13 @@
 - Never expose sensitive data in frontend code
 - Always validate user authentication
 - Secure API endpoints with proper authorization
+- Store API keys securely
 
 ### 10. Testing
 - Test API integrations thoroughly
 - Verify authentication flows
-- Test user flows and navigation 
+- Test user flows and navigation
+- Test Printify API integration scenarios
 
 ## Database Access Pattern
 
