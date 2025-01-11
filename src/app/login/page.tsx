@@ -13,11 +13,13 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');  // Clear previous errors
     try {
       await authService.login(username, password);
       router.push('/mockup/list');
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      console.error('Login error:', err);
+      setError(err.message || "Login failed. Please check your credentials.");
     }
   };
 
@@ -35,6 +37,7 @@ const Login = () => {
                   width={200}
                   height={40}
                   className="mx-auto mb-8"
+                  style={{ width: 'auto', height: 'auto' }}
                 />
                 <h2 className="text-3xl font-bold mb-4">Welcome to MockyLab</h2>
                 <p className="text-lg text-gray-100">
