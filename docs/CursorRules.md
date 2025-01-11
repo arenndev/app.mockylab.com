@@ -1,12 +1,57 @@
+# Database Access Pattern
+
+## Unit of Work Pattern
+The application uses the Unit of Work pattern for database operations:
+
+```csharp
+public interface IUnitOfWork : IDisposable
+{
+    IGenericRepository<TEntity> GetRepository<TEntity>() where TEntity : class;
+    Task<int> SaveChangesAsync();
+    void BeginTransaction();
+    void CommitTransaction();
+    void RollbackTransaction();
+}
+```
+
+## Generic Repository Pattern
+```csharp
+public interface IGenericRepository<T> where T : class
+{
+    IQueryable<T> Get(Expression<Func<T, bool>> filter = null);
+    Task<T> GetByIdAsync(object id);
+    Task InsertAsync(T entity);
+    void Update(T entity);
+    void Delete(T entity);
+}
+```
+
+## Usage Example
+```csharp
+public async Task DoSomething()
+{
+    try
+    {
+        _unitOfWork.BeginTransaction();
+        var repository = _unitOfWork.GetRepository<SomeEntity>();
+        
+        // Do operations
+        
+        await _unitOfWork.SaveChangesAsync();
+        _unitOfWork.CommitTransaction();
+    }
+    catch
+    {
+        _unitOfWork.RollbackTransaction();
+        throw;
+    }
+}
+```
+
 # Authentication and Login Implementation
 
 ## Authentication Service
-
-The authentication service handles user login, token management, and session persistence. Here's how it's implemented:
-
 ```typescript
-// src/services/authService.ts
-
 const API_URL = 'http://localhost:5002/api';
 
 export const authService = {
@@ -18,7 +63,6 @@ export const authService = {
       });
       
       if (response.data.token) {
-        // Store user data
         const user = {
           userId: response.data.userId,
           username: response.data.username,
@@ -26,98 +70,142 @@ export const authService = {
           token: response.data.token
         };
 
-        // Persist in localStorage and cookies
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(user));
         
-        // Set cookie
         Cookies.set('token', response.data.token, {
-          expires: 1, // 1 day
+          expires: 1,
           path: '/',
           sameSite: 'strict',
           secure: process.env.NODE_ENV === 'production'
         });
         
-        // Set default Authorization header
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
       }
-      
       return response.data;
     } catch (error) {
-      // Handle errors
       throw new Error('Invalid credentials or network error');
     }
   },
-
   logout() {
-    // Clear all auth data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     Cookies.remove('token', { path: '/' });
     delete axios.defaults.headers.common['Authorization'];
-  },
-
-  getCurrentUser() {
-    try {
-      const userStr = localStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
-    } catch (error) {
-      return null;
-    }
-  },
-
-  getToken() {
-    return localStorage.getItem('token') || Cookies.get('token');
   }
 };
 ```
 
-## Key Features
+# Printify Integration
 
-1. **Token Management**
-   - JWT tokens are stored in both localStorage and cookies
-   - Token is automatically added to all subsequent API requests
-   - Token expiration is handled (1 day)
+## Blueprint Management
 
-2. **Session Persistence**
-   - User data is stored in localStorage
-   - Token is stored in both localStorage and cookies for redundancy
-   - Secure cookie settings in production
-
-3. **Error Handling**
-   - Network errors are caught and handled
-   - Invalid credentials are properly reported
-   - Token validation errors trigger logout
-
-4. **Security Considerations**
-   - Cookies use 'strict' SameSite in production
-   - Secure flag is enabled in production
-   - Sensitive data is not logged
-
-## Usage Example
-
+### Blueprint Entity
 ```typescript
-// Login
-try {
-  await authService.login(username, password);
-  // Redirect on success
-  router.push('/dashboard');
-} catch (error) {
-  // Handle error
-  setError(error.message);
+interface Blueprint {
+  id: number;
+  title: string;
+  description: string;
+  brand: string;
+  model: string;
+  images: string[];
+  isActive: boolean;
 }
 
-// Get current user
-const user = authService.getCurrentUser();
-
-// Logout
-authService.logout();
+interface BlueprintListResponse {
+  items: Blueprint[];
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
 ```
 
-## Important Notes
+### Backend Implementation
+```csharp
+public async Task<(List<PrintifyBlueprint> Items, int TotalCount)> GetBlueprintsFromDbAsync(
+    string? search = null,
+    string? brand = null,
+    int page = 1,
+    int pageSize = 12)
+{
+    var query = _unitOfWork.GetRepository<PrintifyBlueprint>()
+        .Get(b => b.IsActive);
 
-1. Always use HTTPS in production
-2. Keep tokens secure and never expose them
-3. Implement proper token refresh mechanism
-4. Handle token expiration gracefully
-5. Clear all auth data on logout 
+    // Case-insensitive search
+    if (!string.IsNullOrEmpty(search))
+    {
+        var searchLower = search.ToLower();
+        query = query.Where(b => 
+            EF.Functions.Like(b.Title.ToLower(), $"%{searchLower}%") || 
+            EF.Functions.Like(b.Description.ToLower(), $"%{searchLower}%") || 
+            EF.Functions.Like(b.Model.ToLower(), $"%{searchLower}%"));
+    }
+
+    if (!string.IsNullOrEmpty(brand))
+    {
+        var brandLower = brand.ToLower();
+        query = query.Where(b => b.Brand.ToLower() == brandLower);
+    }
+
+    var totalCount = await query.CountAsync();
+    var items = await query
+        .OrderBy(b => b.Brand)
+        .ThenBy(b => b.Title)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
+
+    return (items, totalCount);
+}
+```
+
+### Frontend Implementation
+Blueprint listing page features:
+- Grid layout (4x3)
+- 12 blueprints per page
+- Search in title, description, and model
+- Filter by brand
+- Pagination
+- Lazy image loading
+
+## Next Steps: Variant Management
+
+### Variant Entity Structure
+```typescript
+interface Variant {
+  id: number;
+  title: string;
+  options: {
+    color: string;
+    size: string;
+  };
+  placeholders: {
+    position: string;
+    width: number;
+    height: number;
+  }[];
+}
+```
+
+### Planned Features
+1. User-specific blueprint selection
+   - Allow users to select products they want to sell
+   - Save selected blueprints
+
+2. Variant management
+   - Endpoint: `/v1/catalog/blueprints/{blueprintId}/print_providers/99/variants.json`
+   - Fetch variant data for selected blueprints
+   - Store variant data in database
+
+3. Blueprint detail page
+   - Detailed blueprint information
+   - Variant list and management
+   - Placeholder preview
+
+### Important Notes
+- Fetch variant data only for selected blueprints
+- Optimize data management with user-based blueprint selection
+- Implement regular variant data updates 

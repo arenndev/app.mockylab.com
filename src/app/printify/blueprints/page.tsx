@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import axios from 'axios';
+import { authService } from '@/services/authService';
 
 interface Blueprint {
   id: number;
@@ -40,10 +41,13 @@ const PrintifyBlueprints = () => {
   const [blueprints, setBlueprints] = useState<BlueprintListResponse | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(12);
+  const [selectedBlueprints, setSelectedBlueprints] = useState<Set<number>>(new Set());
+  const [isAccepting, setIsAccepting] = useState<number | null>(null);
 
   const fetchBlueprints = async () => {
     setIsLoading(true);
     try {
+      const token = authService.getToken();
       const queryParams = new URLSearchParams();
       
       if (filters.search) queryParams.append('search', filters.search);
@@ -54,7 +58,12 @@ const PrintifyBlueprints = () => {
       console.log('Fetching with params:', queryParams.toString());
 
       const response = await axios.get<BlueprintListResponse>(
-        `http://localhost:5002/api/Printify/blueprints?${queryParams}`
+        `http://localhost:5002/api/Printify/blueprints?${queryParams}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
       );
       setBlueprints(response.data);
     } catch (error) {
@@ -68,6 +77,26 @@ const PrintifyBlueprints = () => {
   useEffect(() => {
     fetchBlueprints();
   }, []); // Empty dependency array - only run once on mount
+
+  // Fetch user's existing blueprints
+  useEffect(() => {
+    const fetchUserBlueprints = async () => {
+      try {
+        const token = authService.getToken();
+        const response = await axios.get('http://localhost:5002/api/UserOfBlueprint/user/1', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        const userBlueprintIds: Set<number> = new Set(response.data.map((ub: { blueprintId: number }) => ub.blueprintId));
+        setSelectedBlueprints(userBlueprintIds);
+      } catch (error) {
+        console.error('Error fetching user blueprints:', error);
+      }
+    };
+
+    fetchUserBlueprints();
+  }, []);
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({
@@ -94,6 +123,26 @@ const PrintifyBlueprints = () => {
     });
     setPage(1);
     fetchBlueprints();
+  };
+
+  const handleAcceptBlueprint = async (blueprintId: number) => {
+    setIsAccepting(blueprintId);
+    try {
+      const token = authService.getToken();
+      await axios.post('http://localhost:5002/api/UserOfBlueprint', {
+        userId: 1,
+        blueprintId: blueprintId
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setSelectedBlueprints(prev => new Set([...prev, blueprintId]));
+    } catch (error) {
+      console.error('Error accepting blueprint:', error);
+    } finally {
+      setIsAccepting(null);
+    }
   };
 
   return (
@@ -185,7 +234,29 @@ const PrintifyBlueprints = () => {
                           <div className="p-4">
                             <h3 className="font-semibold text-lg mb-2">{blueprint.title}</h3>
                             <p className="text-sm text-gray-600 mb-2">Brand: {blueprint.brand}</p>
-                            <p className="text-sm text-gray-600">Model: {blueprint.model}</p>
+                            <p className="text-sm text-gray-600 mb-4">Model: {blueprint.model}</p>
+                            
+                            {/* Accept Button */}
+                            <button
+                              onClick={() => handleAcceptBlueprint(blueprint.id)}
+                              disabled={selectedBlueprints.has(blueprint.id) || isAccepting === blueprint.id}
+                              className={`w-full px-4 py-2 rounded transition-colors ${
+                                selectedBlueprints.has(blueprint.id)
+                                  ? 'bg-success text-white cursor-not-allowed'
+                                  : 'bg-primary text-white hover:bg-primary/90'
+                              }`}
+                            >
+                              {isAccepting === blueprint.id ? (
+                                <span className="flex items-center justify-center">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                  Adding...
+                                </span>
+                              ) : selectedBlueprints.has(blueprint.id) ? (
+                                'Added'
+                              ) : (
+                                'Add to My Blueprints'
+                              )}
+                            </button>
                           </div>
                         </div>
                       ))}
