@@ -111,6 +111,7 @@ const BlueprintDetail = () => {
         }
       );
       console.log('Database Variants Response:', response.data);
+      console.log('First variant details:', response.data.variants?.[0]);
       
       if (!response.data.variants || response.data.variants.length === 0) {
         setNeedsSync(true);
@@ -269,7 +270,8 @@ const BlueprintDetail = () => {
                         <h4 className="font-semibold mb-2">{variant.title}</h4>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           <p>Provider ID: {variants.printProviderId}</p>
-                          <p>Variant ID: {variant.id}</p>
+                          <p>ID: {variant.id}</p>
+                          <p>Variant ID: {variant.variantId}</p>
                           <div className="mt-2">
                             <p className="font-medium mb-1">Options:</p>
                             {Object.entries(variant.options).map(([key, value]) => (
