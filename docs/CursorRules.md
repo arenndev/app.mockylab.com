@@ -157,6 +157,48 @@ interface UserBlueprint {
    - Auth token ile güvenli erişim
    - Hata yönetimi ve retry mekanizması
 
+#### Variant Management
+
+1. **Entities**:
+```typescript
+interface BlueprintVariant {
+    id: number;
+    blueprintId: number;
+    printProviderId: number;
+    variantId: number;
+    title: string;
+    options: string; // JSON formatted options
+    isActive: boolean;
+    placeholders: VariantPlaceholder[];
+}
+
+interface VariantPlaceholder {
+    id: number;
+    variantId: number;
+    position: string;
+    width: number;
+    height: number;
+    isActive: boolean;
+}
+```
+
+2. **API Endpoints**:
+   - GET `/api/Printify/blueprints/{blueprintId}/variants` - Variant listesi (sayfalı)
+   - GET `/api/Printify/variants/{variantId}` - Variant detayı
+   - POST `/api/Printify/blueprints/{blueprintId}/variants/sync` - Variant senkronizasyonu
+
+3. **Features**:
+   - JSONB veri depolama
+   - Otomatik API senkronizasyonu
+   - Sayfalı veri çekme
+   - Placeholder yönetimi
+   - Variant önizleme
+
+4. **Frontend Pages**:
+   - `/printify/blueprints/[id]` - Blueprint detay sayfası ve variant listesi
+   - Variant kartları ve placeholder bilgileri
+   - Görsel önizleme ve seçim
+
 ### 8. Error Handling
 - Proper error messages for API failures
 - User-friendly error displays

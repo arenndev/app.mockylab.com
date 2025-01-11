@@ -129,17 +129,45 @@ const PrintifyBlueprints = () => {
     setIsAccepting(blueprintId);
     try {
       const token = authService.getToken();
-      await axios.post('http://localhost:5002/api/UserOfBlueprint', {
-        userId: 1,
-        blueprintId: blueprintId
-      }, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      
+      // 1. Önce varyantları kontrol et
+      const variantCheckResponse = await axios.post(
+        `http://localhost:5002/api/Printify/blueprints/${blueprintId}/variants/sync`,
+        {},
+        {
+          params: {
+            printProviderId: 99
+          },
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      });
-      setSelectedBlueprints(prev => new Set([...prev, blueprintId]));
+      );
+
+      // Varyant kontrolü başarılıysa blueprint'i ekle
+      if (variantCheckResponse.status === 200) {
+        // 2. Blueprint'i kullanıcının koleksiyonuna ekle
+        await axios.post('http://localhost:5002/api/UserOfBlueprint', {
+          userId: 1,
+          blueprintId: blueprintId
+        }, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        setSelectedBlueprints(prev => new Set([...prev, blueprintId]));
+      }
     } catch (error) {
       console.error('Error accepting blueprint:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 500 && error.response?.data.includes('404')) {
+          alert('This blueprint is not available for the selected provider (99). Please choose another blueprint.');
+        } else {
+          alert('An error occurred while adding the blueprint. Please try again.');
+        }
+      }
     } finally {
       setIsAccepting(null);
     }

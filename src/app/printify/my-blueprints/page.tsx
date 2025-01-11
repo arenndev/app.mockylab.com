@@ -5,6 +5,7 @@ import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import axios from 'axios';
 import { authService } from '@/services/authService';
+import { useRouter } from 'next/navigation';
 
 interface Blueprint {
   id: number;
@@ -26,6 +27,7 @@ interface UserBlueprint {
 }
 
 const MyBlueprints = () => {
+  const router = useRouter();
   const [userBlueprints, setUserBlueprints] = useState<UserBlueprint[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,12 +182,20 @@ const MyBlueprints = () => {
                           <p className="text-sm text-gray-600 mb-4">
                             Model: {userBlueprint.blueprint?.model || 'N/A'}
                           </p>
-                          <button
-                            onClick={() => handleRemoveBlueprint(userBlueprint.id)}
-                            className="w-full px-4 py-2 bg-danger text-white rounded hover:bg-danger/90 transition-colors"
-                          >
-                            Remove
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={() => router.push(`/printify/my-blueprints/${userBlueprint.blueprintId}`)}
+                              className="w-full px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+                            >
+                              View Details
+                            </button>
+                            <button
+                              onClick={() => handleRemoveBlueprint(userBlueprint.id)}
+                              className="w-full px-4 py-2 bg-danger text-white rounded hover:bg-danger/90 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
