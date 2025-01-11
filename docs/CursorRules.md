@@ -1,7 +1,34 @@
-# Database Access Pattern
+# Cursor Rules for MockyLab Project
 
-## Unit of Work Pattern
-The application uses the Unit of Work pattern for database operations:
+## Project Structure
+- Frontend: Next.js project (MockyLab.FrontNextJs)
+- Backend: .NET project (managed in Rider)
+
+## Development Rules
+
+### 1. Code Organization
+- Backend changes are made in Rider
+- Frontend changes are made in Cursor
+- Keep separation of concerns in mind
+
+### 2. API Integration
+- Base API URL: http://localhost:5002/api
+- All API endpoints should be properly authenticated
+- Store sensitive data securely in the database
+
+### 3. Authentication
+- JWT-based authentication
+- Token stored in both localStorage and cookies
+- Automatic redirect to login page when unauthorized
+
+### 4. Frontend Structure
+- Pages organized by feature (e.g., /mockup, /printify)
+- Shared components in /components directory
+- Services in /services directory
+
+### 5. Database Access Pattern
+
+The project uses Unit of Work and Generic Repository patterns:
 
 ```csharp
 public interface IUnitOfWork : IDisposable
@@ -12,10 +39,7 @@ public interface IUnitOfWork : IDisposable
     void CommitTransaction();
     void RollbackTransaction();
 }
-```
 
-## Generic Repository Pattern
-```csharp
 public interface IGenericRepository<T> where T : class
 {
     IQueryable<T> Get(Expression<Func<T, bool>> filter = null);
@@ -26,31 +50,8 @@ public interface IGenericRepository<T> where T : class
 }
 ```
 
-## Usage Example
-```csharp
-public async Task DoSomething()
-{
-    try
-    {
-        _unitOfWork.BeginTransaction();
-        var repository = _unitOfWork.GetRepository<SomeEntity>();
-        
-        // Do operations
-        
-        await _unitOfWork.SaveChangesAsync();
-        _unitOfWork.CommitTransaction();
-    }
-    catch
-    {
-        _unitOfWork.RollbackTransaction();
-        throw;
-    }
-}
-```
+### 6. Authentication Service
 
-# Authentication and Login Implementation
-
-## Authentication Service
 ```typescript
 const API_URL = 'http://localhost:5002/api';
 
@@ -87,20 +88,24 @@ export const authService = {
       throw new Error('Invalid credentials or network error');
     }
   },
+  
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     Cookies.remove('token', { path: '/' });
     delete axios.defaults.headers.common['Authorization'];
+  },
+
+  getToken() {
+    return localStorage.getItem('token') || Cookies.get('token');
   }
 };
 ```
 
-# Printify Integration
+### 7. Printify Integration
 
-## Blueprint Management
+#### Blueprint Management
 
-### Blueprint Entity
 ```typescript
 interface Blueprint {
   id: number;
@@ -121,91 +126,51 @@ interface BlueprintListResponse {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
 }
-```
 
-### Backend Implementation
-```csharp
-public async Task<(List<PrintifyBlueprint> Items, int TotalCount)> GetBlueprintsFromDbAsync(
-    string? search = null,
-    string? brand = null,
-    int page = 1,
-    int pageSize = 12)
-{
-    var query = _unitOfWork.GetRepository<PrintifyBlueprint>()
-        .Get(b => b.IsActive);
-
-    // Case-insensitive search
-    if (!string.IsNullOrEmpty(search))
-    {
-        var searchLower = search.ToLower();
-        query = query.Where(b => 
-            EF.Functions.Like(b.Title.ToLower(), $"%{searchLower}%") || 
-            EF.Functions.Like(b.Description.ToLower(), $"%{searchLower}%") || 
-            EF.Functions.Like(b.Model.ToLower(), $"%{searchLower}%"));
-    }
-
-    if (!string.IsNullOrEmpty(brand))
-    {
-        var brandLower = brand.ToLower();
-        query = query.Where(b => b.Brand.ToLower() == brandLower);
-    }
-
-    var totalCount = await query.CountAsync();
-    var items = await query
-        .OrderBy(b => b.Brand)
-        .ThenBy(b => b.Title)
-        .Skip((page - 1) * pageSize)
-        .Take(pageSize)
-        .ToListAsync();
-
-    return (items, totalCount);
-}
-```
-
-### Frontend Implementation
-Blueprint listing page features:
-- Grid layout (4x3)
-- 12 blueprints per page
-- Search in title, description, and model
-- Filter by brand
-- Pagination
-- Lazy image loading
-
-## Next Steps: Variant Management
-
-### Variant Entity Structure
-```typescript
-interface Variant {
+interface UserBlueprint {
   id: number;
-  title: string;
-  options: {
-    color: string;
-    size: string;
-  };
-  placeholders: {
-    position: string;
-    width: number;
-    height: number;
-  }[];
+  userId: number;
+  blueprintId: number;
+  createdAt: string;
+  updatedAt: string | null;
+  isActive: boolean;
+  blueprint?: Blueprint;
 }
 ```
 
-### Planned Features
-1. User-specific blueprint selection
-   - Allow users to select products they want to sell
-   - Save selected blueprints
+#### User Blueprint Management
 
-2. Variant management
-   - Endpoint: `/v1/catalog/blueprints/{blueprintId}/print_providers/99/variants.json`
-   - Fetch variant data for selected blueprints
-   - Store variant data in database
+1. **API Endpoints**:
+   - POST `/api/UserOfBlueprint` - Blueprint ekleme
+   - GET `/api/UserOfBlueprint/user/{userId}` - Kullanıcının blueprint'lerini listeleme
+   - DELETE `/api/UserOfBlueprint/{id}` - Blueprint silme
+   - GET `/api/Printify/blueprints/{id}` - Blueprint detaylarını getirme
 
-3. Blueprint detail page
-   - Detailed blueprint information
-   - Variant list and management
-   - Placeholder preview
+2. **Frontend Pages**:
+   - `/printify/blueprints` - Blueprint listeleme ve seçme
+   - `/printify/my-blueprints` - Seçilen blueprint'leri görüntüleme
 
-### Important Notes
-- Fetch variant data only for selected blueprints
-- Optimize data management with user-based blueprint selection
-- Implement regular variant data updates 
+3. **Features**:
+   - Blueprint arama ve filtreleme
+   - Sayfalama (12 blueprint per page)
+   - Lazy image loading
+   - Auth token ile güvenli erişim
+   - Hata yönetimi ve retry mekanizması
+
+### 8. Error Handling
+- Proper error messages for API failures
+- User-friendly error displays
+- Retry mechanism for failed requests
+- Redirect to login when authentication fails
+
+### 9. Security
+- Never expose sensitive data in frontend code
+- Always validate user authentication
+- Secure API endpoints with proper authorization
+- Use proper token management
+
+### 10. Testing
+- Test API integrations thoroughly
+- Verify authentication flows
+- Test user flows and navigation
+- Check error handling scenarios 
