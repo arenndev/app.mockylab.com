@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mockylab-fe-deployment
+  namespace: default
+  labels:
+    app: mockylab-fe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mockylab-fe
+  template:
+    metadata:
+      labels:
+        app: mockylab-fe
+    spec:
+      containers:
+      - name: mockylab-fe
+        image: ghcr.io/arenndev/mockylab-fe:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "https://api.mockylab.com"
+        - name: NODE_ENV
+          value: "production"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      imagePullSecrets:
+      - name: ghcr-secret
+      nodeSelector:
+        kubernetes.io/arch: amd64 

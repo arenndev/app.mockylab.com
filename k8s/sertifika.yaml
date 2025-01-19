@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+  name: mockylab-fe-ingress
+  namespace: default
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: app.mockylab.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: mockylab-fe-service
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - app.mockylab.com
+      secretName: mockylab-fe-tls

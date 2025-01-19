@@ -7,6 +7,7 @@ import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { authService } from "@/services/authService";
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { API_URL } from '@/utils/apiConfig';
 
 export default function DesignCreate() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -45,7 +46,7 @@ export default function DesignCreate() {
       const formData = new FormData();
       formData.append("imageFile", selectedImage);
 
-      const response = await fetch("http://localhost:5002/api/Ideogram/get-description", {
+      const response = await fetch(`${API_URL}/Ideogram/get-description`, {
         method: "POST",
         body: formData,
         headers: {
@@ -79,9 +80,8 @@ export default function DesignCreate() {
         return;
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const response = await axios.post(
-        `${API_URL}/api/Ideogram/remove-background`,
+        `${API_URL}/Ideogram/remove-background`,
         { imageUrl: imageUrl },
         {
           headers: {
@@ -130,8 +130,7 @@ export default function DesignCreate() {
         tempImagePath: tempPath
       });
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      const response = await axios.post(`${API_URL}/api/Ideogram/remix`, params, {
+      const response = await axios.post(`${API_URL}/Ideogram/remix`, params, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -173,10 +172,9 @@ export default function DesignCreate() {
         return;
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       let endpoint = withBackground 
-          ? `${API_URL}/api/Ideogram/download-image?imageUrl=${encodeURIComponent(imageUrl)}`
-          : `${API_URL}/api/Ideogram/get-processed-image?filePath=${encodeURIComponent(imageUrl)}`;
+          ? `${API_URL}/Ideogram/download-image?imageUrl=${encodeURIComponent(imageUrl)}`
+          : `${API_URL}/Ideogram/get-processed-image?filePath=${encodeURIComponent(imageUrl)}`;
 
       const response = await fetch(endpoint, {
         headers: {

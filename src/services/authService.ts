@@ -1,7 +1,9 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { API_URL, AUTH_ENDPOINTS, getFullUrl } from '../utils/apiConfig';
 
-const API_URL = 'http://localhost:5002/api';
+console.log('Environment:', process.env.NODE_ENV);
+console.log('API URL:', API_URL);
 
 // Add default headers and axios configuration
 axios.defaults.headers.post['Content-Type'] = 'application/json';
@@ -15,9 +17,11 @@ if (process.env.NODE_ENV === 'development') {
 export const authService = {
   async login(username: string, password: string) {
     try {
+      const loginUrl = getFullUrl(AUTH_ENDPOINTS.login);
       console.log('Sending login request:', { username, password });
+      console.log('Using API URL:', loginUrl);
       
-      const response = await axios.post(`${API_URL}/Auth/login`, {
+      const response = await axios.post(loginUrl, {
         username,
         password
       });
