@@ -9,6 +9,7 @@ import axios from 'axios';
 import Loader from '@/components/common/Loader';
 import { authService } from '@/services/authService';
 import { useRouter } from 'next/navigation';
+import { API_URL } from '@/utils/apiConfig';
 
 enum TshirtCategory {
   TSHIRT = 'Tshirt',
@@ -329,7 +330,6 @@ const EditMockupPage = () => {
   const fetchMockupData = useCallback(async (mockupId: string) => {
     setIsLoading(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const token = authService.getToken();
       if (!token) {
         router.push('/login');
@@ -337,7 +337,7 @@ const EditMockupPage = () => {
       }
 
       // Önce mockup verilerini al
-      const mockupResponse = await axios.get(`${API_URL}/api/Mockup/${mockupId}`, {
+      const mockupResponse = await axios.get(`${API_URL}/Mockup/${mockupId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -385,7 +385,7 @@ const EditMockupPage = () => {
 
             // Design area'ları ayrı endpoint'ten al
             try {
-              const areasResponse = await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas`, {
+              const areasResponse = await fetch(`${API_URL}/mockups/${mockupId}/design-areas`, {
                 headers: {
                   'Authorization': `Bearer ${token}`
                 }
@@ -568,7 +568,6 @@ const EditMockupPage = () => {
         throw new Error('Mockup ID is required');
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const token = authService.getToken();
       if (!token) {
         router.push('/login');
@@ -633,7 +632,7 @@ const EditMockupPage = () => {
           finalHeight: originalHeight
         });
 
-        const response = await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas/${rect.designAreaId}`, {
+        const response = await fetch(`${API_URL}/mockups/${mockupId}/design-areas/${rect.designAreaId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -692,7 +691,6 @@ const EditMockupPage = () => {
       }
 
       setIsLoading(true);
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const token = authService.getToken();
       if (!token) {
         router.push('/login');
@@ -711,7 +709,7 @@ const EditMockupPage = () => {
         formDataToSend.append('ImageFile', formData.imageFile);
       }
 
-      const response = await fetch(`${API_URL}/api/Mockup/${mockupId}`, {
+      const response = await fetch(`${API_URL}/Mockup/${mockupId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -751,7 +749,6 @@ const EditMockupPage = () => {
       setIsLoading(true);
       if (!selectedGroup || !mockupId) return;
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const token = authService.getToken();
       if (!token) {
         router.push('/login');
@@ -763,7 +760,7 @@ const EditMockupPage = () => {
         throw new Error('Selected area has no ID');
       }
 
-      const response = await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas/${rect.designAreaId}`, {
+      const response = await fetch(`${API_URL}/mockups/${mockupId}/design-areas/${rect.designAreaId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -844,7 +841,6 @@ const EditMockupPage = () => {
       setIsLoading(true);
       if (!mockupId || !canvas || !isNewAreaPending) return;
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const token = authService.getToken();
       if (!token) {
         router.push('/login');
@@ -886,7 +882,7 @@ const EditMockupPage = () => {
         angle: activeGroup.angle || 0
       };
 
-      const response = await fetch(`${API_URL}/api/mockups/${mockupId}/design-areas`, {
+      const response = await fetch(`${API_URL}/mockups/${mockupId}/design-areas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

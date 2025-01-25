@@ -6,6 +6,7 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import axios from 'axios';
 import { authService } from '@/services/authService';
 import { useRouter } from 'next/navigation';
+import { API_URL } from '@/utils/apiConfig';
 
 interface Blueprint {
   id: number;
@@ -35,7 +36,7 @@ const MyBlueprints = () => {
   const fetchBlueprintDetails = async (blueprintId: number, token: string, retryCount = 0): Promise<Blueprint | null> => {
     try {
       const response = await axios.get<Blueprint>(
-        `http://localhost:5002/api/Printify/blueprints/${blueprintId}`,
+        `${API_URL}/Printify/blueprints/${blueprintId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -64,7 +65,7 @@ const MyBlueprints = () => {
         return null;
       }
       const response = await axios.get<UserBlueprint[]>(
-        'http://localhost:5002/api/UserOfBlueprint/user/1',
+        `${API_URL}/UserOfBlueprint/user/1`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -102,7 +103,7 @@ const MyBlueprints = () => {
   const handleRemoveBlueprint = async (id: number) => {
     try {
       const token = authService.getToken();
-      await axios.delete(`http://localhost:5002/api/UserOfBlueprint/${id}`, {
+      await axios.delete(`${API_URL}/UserOfBlueprint/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

@@ -7,6 +7,7 @@ import { authService } from "@/services/authService";
 import axios from 'axios';
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import { API_URL } from '@/utils/apiConfig';
 
 interface FavoriteList {
   id: number;
@@ -69,9 +70,7 @@ const FavoritePage = () => {
       }
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      
-      const response = await axios.get(`${API_URL}/api/Favorite/${user.userId}/lists`);
+      const response = await axios.get(`${API_URL}/Favorite/${user.userId}/lists`);
       console.log("API Response:", response.data);
       
       let newLists: FavoriteList[] = [];
@@ -109,8 +108,7 @@ const FavoritePage = () => {
       if (!token) return;
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      const response = await axios.get(`${API_URL}/api/Mockup`);
+      const response = await axios.get(`${API_URL}/Mockup`);
       if (response.data.success) {
         setMockups(response.data.data.map((mockup: any) => ({
           id: mockup.id,
@@ -148,9 +146,8 @@ const FavoritePage = () => {
       }
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       const response = await axios.post(
-        `${API_URL}/api/Favorite/${user.userId}/lists?listName=${encodeURIComponent(newListName)}&category=${encodeURIComponent(newListCategory)}`
+        `${API_URL}/Favorite/${user.userId}/lists?listName=${encodeURIComponent(newListName)}&category=${encodeURIComponent(newListCategory)}`
       );
       
       if (response.data) {
@@ -195,15 +192,14 @@ const FavoritePage = () => {
       if (!token) return;
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
 
       if (deleteModal.type === 'list') {
         setDeletingListIds(prev => [...prev, deleteModal.listId]);
-        await axios.delete(`${API_URL}/api/Favorite/lists/${deleteModal.listId}`);
+        await axios.delete(`${API_URL}/Favorite/lists/${deleteModal.listId}`);
       } else if (deleteModal.type === 'mockup' && deleteModal.mockupId) {
         setRemovingMockupIds(prev => [...prev, { listId: deleteModal.listId, mockupId: deleteModal.mockupId! }]);
         await axios.delete(
-          `${API_URL}/api/Favorite/lists/${deleteModal.listId}/mockups/${deleteModal.mockupId}`
+          `${API_URL}/Favorite/lists/${deleteModal.listId}/mockups/${deleteModal.mockupId}`
         );
       }
 
@@ -221,10 +217,8 @@ const FavoritePage = () => {
       if (!token) return;
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      
       const response = await axios.post(
-        `${API_URL}/api/Favorite/lists/${listId}/mockups/batch`,
+        `${API_URL}/Favorite/lists/${listId}/mockups/batch`,
         mockupIds
       );
       
@@ -262,10 +256,8 @@ const FavoritePage = () => {
       );
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      
       const response = await axios.delete(
-        `${API_URL}/api/Favorite/lists/${listId}/mockups/${mockupId}`
+        `${API_URL}/Favorite/lists/${listId}/mockups/${mockupId}`
       );
       
       if (!response.data.success) {

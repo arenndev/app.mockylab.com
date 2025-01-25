@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { API_URL } from '@/utils/apiConfig';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import BlueprintSelectModal from '@/components/Modals/BlueprintSelectModal';
@@ -79,7 +80,7 @@ const CreateProduct = () => {
 
             // Önce blueprint detaylarını al
             const blueprintResponse = await axios.get(
-                `http://localhost:5002/api/Printify/blueprints/${blueprint.id}`,
+                `${API_URL}/Printify/blueprints/${blueprint.id}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -94,7 +95,7 @@ const CreateProduct = () => {
 
                 // Backend'den variant'ları al
                 const variantsResponse = await axios.get(
-                    `http://localhost:5002/api/Printify/blueprints/${blueprint.id}/variants`,
+                    `${API_URL}/Printify/blueprints/${blueprint.id}/variants`,
                     {
                         params: {
                             printProviderId: 99,
@@ -197,7 +198,7 @@ const CreateProduct = () => {
             console.log('Creating product with data:', requestData);
 
             const response = await axios.post(
-                'http://localhost:5002/api/Printify/products',
+                `${API_URL}/Printify/products`,
                 requestData,
                 {
                     headers: {
@@ -431,7 +432,7 @@ const CreateProduct = () => {
                                             }
 
                                             const response = await axios.post(
-                                                'http://localhost:5002/api/PrintifyImage/upload',
+                                                `${API_URL}/PrintifyImage/upload`,
                                                 formData,
                                                 {
                                                     headers: {

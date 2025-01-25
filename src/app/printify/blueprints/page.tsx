@@ -5,6 +5,7 @@ import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import axios from 'axios';
 import { authService } from '@/services/authService';
+import { API_URL } from '@/utils/apiConfig';
 
 interface Blueprint {
   id: number;
@@ -58,7 +59,7 @@ const PrintifyBlueprints = () => {
       console.log('Fetching with params:', queryParams.toString());
 
       const response = await axios.get<BlueprintListResponse>(
-        `http://localhost:5002/api/Printify/blueprints?${queryParams}`,
+        `${API_URL}/Printify/blueprints?${queryParams}`,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -83,7 +84,7 @@ const PrintifyBlueprints = () => {
     const fetchUserBlueprints = async () => {
       try {
         const token = authService.getToken();
-        const response = await axios.get('http://localhost:5002/api/UserOfBlueprint/user/1', {
+        const response = await axios.get(`${API_URL}/UserOfBlueprint/user/1`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -130,9 +131,8 @@ const PrintifyBlueprints = () => {
     try {
       const token = authService.getToken();
       
-      // 1. Önce varyantları kontrol et
       const variantCheckResponse = await axios.post(
-        `http://localhost:5002/api/Printify/blueprints/${blueprintId}/variants/sync`,
+        `${API_URL}/Printify/blueprints/${blueprintId}/variants/sync`,
         {},
         {
           params: {
@@ -145,10 +145,8 @@ const PrintifyBlueprints = () => {
         }
       );
 
-      // Varyant kontrolü başarılıysa blueprint'i ekle
       if (variantCheckResponse.status === 200) {
-        // 2. Blueprint'i kullanıcının koleksiyonuna ekle
-        await axios.post('http://localhost:5002/api/UserOfBlueprint', {
+        await axios.post(`${API_URL}/UserOfBlueprint`, {
           userId: 1,
           blueprintId: blueprintId
         }, {

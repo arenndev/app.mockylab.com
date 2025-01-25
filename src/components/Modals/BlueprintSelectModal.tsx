@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { authService } from '../../services/authService';
+import { API_URL } from '@/utils/apiConfig';
 
 interface Blueprint {
     id: string;
@@ -52,7 +53,7 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
                 setError('No auth token available');
                 return;
             }
-            const response = await axios.get('http://localhost:5002/api/UserOfBlueprint/user/1', {
+            const response = await axios.get(`${API_URL}/UserOfBlueprint/user/1`, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
@@ -62,7 +63,7 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
             const detailedBlueprints = await Promise.all(
                 response.data.map(async (userBlueprint: { blueprintId: number }) => {
                     const blueprintResponse = await axios.get(
-                        `http://localhost:5002/api/Printify/blueprints/${userBlueprint.blueprintId}`,
+                        `${API_URL}/Printify/blueprints/${userBlueprint.blueprintId}`,
                         {
                             headers: {
                                 Authorization: `Bearer ${token}`

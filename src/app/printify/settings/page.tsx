@@ -5,6 +5,7 @@ import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import axios from 'axios';
 import { authService } from '@/services/authService';
+import { API_URL } from '@/utils/apiConfig';
 
 const PrintifySettings = () => {
   const [printifyApiKey, setPrintifyApiKey] = useState('');
@@ -17,7 +18,7 @@ const PrintifySettings = () => {
   useEffect(() => {
     const fetchPrintifySettings = async () => {
       try {
-        const response = await axios.get('http://localhost:5002/api/User/printify-settings');
+        const response = await axios.get(`${API_URL}/User/printify-settings`);
         if (response.data.printifyApiKey) {
           const apiKey = response.data.printifyApiKey;
           setPrintifyApiKey(apiKey);
@@ -45,7 +46,7 @@ const PrintifySettings = () => {
     
     setIsLoading(true);
     try {
-      await axios.post('http://localhost:5002/api/User/printify-api-key', {
+      await axios.post(`${API_URL}/User/printify-api-key`, {
         printifyApiKey
       });
       setMessage({ text: 'API key updated successfully', type: 'success' });
@@ -62,7 +63,7 @@ const PrintifySettings = () => {
   const syncShopId = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.post('http://localhost:5002/api/User/shop-id');
+      const response = await axios.post(`${API_URL}/User/shop-id`);
       setShopId(response.data.shopId);
       setMessage({ text: 'Shop ID synchronized successfully', type: 'success' });
     } catch (error) {

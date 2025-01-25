@@ -6,6 +6,7 @@ import { authService } from "@/services/authService";
 import axios from 'axios';
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Image from "next/image";
+import { API_URL } from "@/utils/apiConfig";
 
 enum DesignColor {
   Black = "Black",
@@ -530,11 +531,10 @@ const GeneratePage = () => {
       }
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
       
-      console.log('Fetching lists for user:', user.userId); // Debug log
-      const response = await axios.get(`${API_URL}/api/Favorite/${user.userId}/lists`);
-      console.log('Lists response:', response.data); // Debug log
+      console.log('Fetching lists for user:', user.userId);
+      const response = await axios.get(`${API_URL}/Favorite/${user.userId}/lists`);
+      console.log('Lists response:', response.data);
 
       let newLists: FavoriteList[] = [];
       
@@ -559,7 +559,7 @@ const GeneratePage = () => {
         }));
       }
 
-      console.log('Processed lists:', newLists); // Debug log
+      console.log('Processed lists:', newLists);
       setLists(newLists);
     } catch (error) {
       console.error("Error fetching lists:", error);
@@ -572,8 +572,7 @@ const GeneratePage = () => {
       if (!token) return;
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      const response = await axios.get(`${API_URL}/api/Mockup`);
+      const response = await axios.get(`${API_URL}/Mockup`);
       if (response.data.success) {
         setMockups(response.data.data);
       }
@@ -744,10 +743,8 @@ const GeneratePage = () => {
         throw new Error("Token not found");
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      
       const response = await axios.post(
-        `${API_URL}/api/Mockup/generate`,
+        `${API_URL}/Mockup/generate`,
         formData,
         {
           responseType: 'blob',

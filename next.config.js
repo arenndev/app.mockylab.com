@@ -8,10 +8,10 @@ const nextConfig = {
     ignoreDuringBuilds: true
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002'
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'
   },
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
     return [
       {
         source: '/api/:path*',

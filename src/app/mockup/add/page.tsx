@@ -8,7 +8,7 @@ import axios from 'axios';
 import Loader from '@/components/common/Loader';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
-import { parseJwt } from '@/services/authService';
+import { API_URL } from '@/utils/apiConfig';
 
 // Enum tanımlamaları
 enum TshirtCategory {
@@ -292,7 +292,7 @@ const AddMockupPage = () => {
 
       // User bilgisini al
       const currentUser = authService.getCurrentUser();
-      console.log('Current user:', currentUser); // Debug için log ekleyelim
+      console.log('Current user:', currentUser);
       
       if (!currentUser || !currentUser.userId) {
         router.push('/auth/signin');
@@ -312,8 +312,6 @@ const AddMockupPage = () => {
         return;
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      
       setAlertState({
         show: true,
         message: 'Creating mockup...',

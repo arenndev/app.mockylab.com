@@ -6,6 +6,7 @@ import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import axios from 'axios';
 import { authService } from '@/services/authService';
 import { useParams } from 'next/navigation';
+import { API_URL } from '@/utils/apiConfig';
 
 interface Blueprint {
   id: number;
@@ -70,7 +71,7 @@ const BlueprintDetail = () => {
         console.error('No auth token found');
         return null;
       }
-      const response = await axios.get(`http://localhost:5002/api/Printify/blueprints/${blueprintId}`, {
+      const response = await axios.get(`${API_URL}/Printify/blueprints/${blueprintId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -97,7 +98,7 @@ const BlueprintDetail = () => {
         return;
       }
       const response = await axios.get<VariantResponse>(
-        `http://localhost:5002/api/Printify/blueprints/${blueprintId}/variants`,
+        `${API_URL}/Printify/blueprints/${blueprintId}/variants`,
         {
           params: {
             printProviderId: 99,
@@ -147,7 +148,7 @@ const BlueprintDetail = () => {
       }
 
       const syncResponse = await axios.post(
-        `http://localhost:5002/api/Printify/blueprints/${blueprintId}/variants/sync`,
+        `${API_URL}/Printify/blueprints/${blueprintId}/variants/sync`,
         {},
         {
           params: {

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
+import { API_URL } from '@/utils/apiConfig';
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
     
     // Authorization header'ını al
     const authHeader = request.headers.get('Authorization');
