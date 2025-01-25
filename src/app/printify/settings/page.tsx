@@ -3,9 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import axios from 'axios';
-import { authService } from '@/services/authService';
-import { API_URL } from '@/utils/apiConfig';
+import { apiClient, endpoints, handleApiError } from '@/utils/apiConfig';
+
+interface PrintifySettings {
+  printifyApiKey?: string;
+  shopId?: string;
+}
 
 const PrintifySettings = () => {
   const [printifyApiKey, setPrintifyApiKey] = useState('');
@@ -18,7 +21,7 @@ const PrintifySettings = () => {
   useEffect(() => {
     const fetchPrintifySettings = async () => {
       try {
-        const response = await axios.get(`${API_URL}/User/printify-settings`);
+        const response = await apiClient.get<PrintifySettings>(endpoints.user.printifySettings);
         if (response.data.printifyApiKey) {
           const apiKey = response.data.printifyApiKey;
           setPrintifyApiKey(apiKey);
@@ -28,7 +31,7 @@ const PrintifySettings = () => {
           setShopId(response.data.shopId);
         }
       } catch (error) {
-        setMessage({ text: 'Failed to load settings', type: 'error' });
+        setMessage({ text: handleApiError(error), type: 'error' });
       }
     };
 
@@ -46,7 +49,7 @@ const PrintifySettings = () => {
     
     setIsLoading(true);
     try {
-      await axios.post(`${API_URL}/User/printify-api-key`, {
+      await apiClient.post(endpoints.user.printifyApiKey, {
         printifyApiKey
       });
       setMessage({ text: 'API key updated successfully', type: 'success' });
@@ -54,7 +57,7 @@ const PrintifySettings = () => {
       setIsEditing(false);
       await syncShopId();
     } catch (error) {
-      setMessage({ text: 'Failed to update API key', type: 'error' });
+      setMessage({ text: handleApiError(error), type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -63,11 +66,11 @@ const PrintifySettings = () => {
   const syncShopId = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/User/shop-id`);
+      const response = await apiClient.post<{ shopId: string }>(endpoints.user.shopId);
       setShopId(response.data.shopId);
       setMessage({ text: 'Shop ID synchronized successfully', type: 'success' });
     } catch (error) {
-      setMessage({ text: 'Failed to sync shop ID', type: 'error' });
+      setMessage({ text: handleApiError(error), type: 'error' });
     } finally {
       setIsLoading(false);
     }

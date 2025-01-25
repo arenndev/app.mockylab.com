@@ -1,93 +1,156 @@
-import axios from 'axios';
+import { apiClient, endpoints } from '@/utils/apiConfig';
+import { jwtDecode } from "jwt-decode";
 import Cookies from 'js-cookie';
-import { API_URL, AUTH_ENDPOINTS, getFullUrl } from '../utils/apiConfig';
 
-console.log('Environment:', process.env.NODE_ENV);
-console.log('API URL:', API_URL);
-
-// Add default headers and axios configuration
-axios.defaults.headers.post['Content-Type'] = 'application/json';
-axios.defaults.headers.post['Accept'] = 'application/json';
-
-// Ignore HTTPS certificate errors in development
-if (process.env.NODE_ENV === 'development') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+interface LoginResponse {
+  token: string;
+  refreshToken?: string;
 }
 
-export const authService = {
-  async login(username: string, password: string) {
+interface DecodedToken {
+  nameIdentifier: string;
+  name: string;
+  email: string;
+  exp: number;
+  [key: string]: any;
+}
+
+class AuthService {
+  private tokenKey = 'token';
+  private refreshTokenKey = 'refreshToken';
+  private userKey = 'user';
+
+  async login(username: string, password: string): Promise<boolean> {
     try {
-      const loginUrl = getFullUrl(AUTH_ENDPOINTS.login);
-      console.log('Sending login request:', { username, password });
-      console.log('Using API URL:', loginUrl);
-      
-      const response = await axios.post(loginUrl, {
+      const response = await apiClient.post<LoginResponse>(endpoints.auth.login, {
         username,
         password
       });
-      
-      console.log('Login response:', response.data);
-      
+
       if (response.data.token) {
-        // Create user object with necessary information
-        const user = {
-          userId: response.data.userId,
-          username: response.data.username,
-          roles: response.data.roles || [],
-          token: response.data.token
-        };
-
+        const decodedToken = jwtDecode<DecodedToken>(response.data.token);
+        
         // Store in both localStorage and cookies
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(user));
-        
-        // Set cookie with options
-        Cookies.set('token', response.data.token, {
+        localStorage.setItem(this.tokenKey, response.data.token);
+        Cookies.set(this.tokenKey, response.data.token, {
           expires: 1, // 1 day
-          path: '/',
-          sameSite: 'strict',
-          secure: process.env.NODE_ENV === 'production'
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict'
         });
-        
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-        
-        // Redirect to mockup list
-        window.location.href = '/mockup/list';
+
+        if (response.data.refreshToken) {
+          localStorage.setItem(this.refreshTokenKey, response.data.refreshToken);
+          Cookies.set(this.refreshTokenKey, response.data.refreshToken, {
+            expires: 7, // 7 days
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+          });
+        }
+
+        localStorage.setItem(this.userKey, JSON.stringify(decodedToken));
+        return true;
       }
-      
-      return response.data;
-    } catch (error: any) {
-      console.error('Login error:', error);
-
-      if (error.response) {
-        console.error('Error response:', error.response.data);
-        throw new Error(error.response.data.message || 'Invalid credentials');
-      }
-      throw new Error('Network error occurred');
-    }
-  },
-
-  logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    Cookies.remove('token', { path: '/' });
-    delete axios.defaults.headers.common['Authorization'];
-    window.location.href = '/login';
-  },
-
-  getCurrentUser() {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (!userStr) return null;
-      return JSON.parse(userStr);
+      return false;
     } catch (error) {
-      console.error('Error getting current user:', error);
+      console.error('Login error:', error);
+      throw error;
+    }
+  }
+
+  logout(): void {
+    // Clear localStorage
+    localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.refreshTokenKey);
+    localStorage.removeItem(this.userKey);
+
+    // Clear cookies
+    Cookies.remove(this.tokenKey);
+    Cookies.remove(this.refreshTokenKey);
+
+    // Clear axios default header
+    delete apiClient.defaults.headers.common['Authorization'];
+  }
+
+  getToken(): string | null {
+    // Try cookie first, then localStorage
+    const token = Cookies.get(this.tokenKey) || localStorage.getItem(this.tokenKey);
+    
+    if (token) {
+      try {
+        const decodedToken = jwtDecode<DecodedToken>(token);
+        const currentTime = Date.now() / 1000;
+        
+        if (decodedToken.exp < currentTime) {
+          // Token expired, try to refresh
+          this.refreshToken().catch(() => {
+            this.logout();
+          });
+          return null;
+        }
+        return token;
+      } catch {
+        // Invalid token
+        this.logout();
+        return null;
+      }
+    }
+    return null;
+  }
+
+  isAuthenticated(): boolean {
+    return this.getToken() !== null;
+  }
+
+  getCurrentUser(): DecodedToken | null {
+    const userStr = localStorage.getItem(this.userKey);
+    if (!userStr) return null;
+    
+    try {
+      return JSON.parse(userStr);
+    } catch {
       return null;
     }
-  },
-
-  getToken() {
-    return localStorage.getItem('token') || Cookies.get('token');
   }
-}; 
+
+  async refreshToken(): Promise<boolean> {
+    const refreshToken = Cookies.get(this.refreshTokenKey) || localStorage.getItem(this.refreshTokenKey);
+    if (!refreshToken) return false;
+
+    try {
+      const response = await apiClient.post<LoginResponse>(endpoints.auth.refreshToken, {
+        refreshToken
+      });
+
+      if (response.data.token) {
+        const decodedToken = jwtDecode<DecodedToken>(response.data.token);
+        
+        // Update both localStorage and cookies
+        localStorage.setItem(this.tokenKey, response.data.token);
+        Cookies.set(this.tokenKey, response.data.token, {
+          expires: 1,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict'
+        });
+
+        if (response.data.refreshToken) {
+          localStorage.setItem(this.refreshTokenKey, response.data.refreshToken);
+          Cookies.set(this.refreshTokenKey, response.data.refreshToken, {
+            expires: 7,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+          });
+        }
+
+        localStorage.setItem(this.userKey, JSON.stringify(decodedToken));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      this.logout();
+      return false;
+    }
+  }
+}
+
+export const authService = new AuthService(); 

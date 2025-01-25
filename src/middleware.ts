@@ -1,44 +1,41 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Public paths that don't require authentication
+const publicPaths = ['/login', '/', '/auth/signup'];
+
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
-  const isLoginPage = request.nextUrl.pathname === '/login';
+  const path = request.nextUrl.pathname;
+  const isPublicPath = publicPaths.includes(path);
 
-  console.log('Current path:', request.nextUrl.pathname);
-  console.log('Token:', token);
-  console.log('Is login page:', isLoginPage);
-
-  // If no token and not on login page, redirect to login
-  if (!token && !isLoginPage) {
-    console.log('Redirecting to login page');
-    return NextResponse.redirect(new URL('/login', request.url));
+  // If no token and trying to access protected route
+  if (!token && !isPublicPath) {
+    const loginUrl = new URL('/login', request.url);
+    // Only add callbackUrl if it's not already a public path
+    if (!publicPaths.includes(path)) {
+      loginUrl.searchParams.set('callbackUrl', path);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
-  // If has token and on login page, redirect to mockup list
-  if (token && isLoginPage) {
-    console.log('Redirecting to mockup list');
+  // If has token and trying to access login/signup
+  if (token && isPublicPath && path !== '/') {
     return NextResponse.redirect(new URL('/mockup/list', request.url));
   }
 
-  // Add token to request headers
-  const headers = new Headers(request.headers);
+  // Add token to request headers for API calls
+  const response = NextResponse.next();
   if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+    response.headers.set('Authorization', `Bearer ${token}`);
   }
-
-  const response = NextResponse.next({
-    request: {
-      headers
-    }
-  });
 
   return response;
 }
 
+// Update config to protect all necessary routes
 export const config = {
   matcher: [
-    '/mockup/:path*',
-    '/login'
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ]
 }; 

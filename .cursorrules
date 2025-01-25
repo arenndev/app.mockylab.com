@@ -1,0 +1,87 @@
+{
+  "project": {
+    "name": "MockyLab Frontend",
+    "type": "Next.js",
+    "description": "Professional mockup design solution with Printify integration"
+  },
+  "architecture": {
+    "routing": {
+      "base": "/src/app",
+      "protected_routes": ["/mockup/*", "/printify/*", "/profile/*", "/settings/*"],
+      "public_routes": ["/login", "/"]
+    },
+    "api": {
+      "base_url": "process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'",
+      "endpoints": {
+        "auth": {
+          "login": "/auth/login",
+          "refresh": "/auth/refresh"
+        },
+        "printify": {
+          "blueprints": "/Printify/blueprints",
+          "variants": "/Printify/variants",
+          "settings": "/Printify/settings"
+        },
+        "mockups": {
+          "base": "/Mockup",
+          "user": "/UserOfMockup"
+        }
+      }
+    }
+  },
+  "features": {
+    "auth": {
+      "token_storage": "localStorage",
+      "token_key": "token",
+      "refresh_token_key": "refreshToken",
+      "user_key": "user"
+    },
+    "printify": {
+      "required_settings": ["apiKey", "shopId"],
+      "blueprint_flow": [
+        "List available blueprints",
+        "Select blueprint",
+        "Sync variants",
+        "Add to user blueprints"
+      ]
+    },
+    "mockup": {
+      "creation_flow": [
+        "Select blueprint",
+        "Configure design areas",
+        "Upload designs",
+        "Generate mockup"
+      ],
+      "required_fields": [
+        "name",
+        "category",
+        "designColor",
+        "designAreas"
+      ]
+    }
+  },
+  "conventions": {
+    "components": {
+      "naming": "PascalCase",
+      "location": "/src/components"
+    },
+    "pages": {
+      "naming": "kebab-case",
+      "structure": "page.tsx in each route directory"
+    },
+    "api": {
+      "client": "apiClient from @/utils/apiConfig",
+      "error_handling": "handleApiError from @/utils/apiConfig"
+    }
+  },
+  "workflow": {
+    "page_development": [
+      "Define route and component structure",
+      "Implement authentication check",
+      "Add API integration",
+      "Implement UI components",
+      "Add error handling",
+      "Test functionality"
+    ]
+  }
+} 

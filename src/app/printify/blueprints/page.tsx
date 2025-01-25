@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
+import { apiClient, endpoints, handleApiError, getCurrentUserId } from '@/utils/apiConfig';
 import axios from 'axios';
-import { authService } from '@/services/authService';
-import { API_URL } from '@/utils/apiConfig';
 
 interface Blueprint {
   id: number;
@@ -44,11 +43,12 @@ const PrintifyBlueprints = () => {
   const [pageSize] = useState(12);
   const [selectedBlueprints, setSelectedBlueprints] = useState<Set<number>>(new Set());
   const [isAccepting, setIsAccepting] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchBlueprints = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const token = authService.getToken();
       const queryParams = new URLSearchParams();
       
       if (filters.search) queryParams.append('search', filters.search);
@@ -56,43 +56,32 @@ const PrintifyBlueprints = () => {
       queryParams.append('page', page.toString());
       queryParams.append('pageSize', pageSize.toString());
 
-      console.log('Fetching with params:', queryParams.toString());
-
-      const response = await axios.get<BlueprintListResponse>(
-        `${API_URL}/Printify/blueprints?${queryParams}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+      const response = await apiClient.get<BlueprintListResponse>(
+        `${endpoints.printify.blueprints.list}?${queryParams.toString()}`
       );
       setBlueprints(response.data);
     } catch (error) {
       console.error('Error fetching blueprints:', error);
+      setError(handleApiError(error));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Initial load - fetch on component mount
   useEffect(() => {
     fetchBlueprints();
-  }, []); // Empty dependency array - only run once on mount
+  }, [page]); // Re-fetch when page changes
 
-  // Fetch user's existing blueprints
   useEffect(() => {
     const fetchUserBlueprints = async () => {
       try {
-        const token = authService.getToken();
-        const response = await axios.get(`${API_URL}/UserOfBlueprint/user/1`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        const userId = getCurrentUserId();
+        const response = await apiClient.get(endpoints.user.blueprints(userId));
         const userBlueprintIds: Set<number> = new Set(response.data.map((ub: { blueprintId: number }) => ub.blueprintId));
         setSelectedBlueprints(userBlueprintIds);
       } catch (error) {
         console.error('Error fetching user blueprints:', error);
+        setError(handleApiError(error));
       }
     };
 
@@ -128,31 +117,23 @@ const PrintifyBlueprints = () => {
 
   const handleAcceptBlueprint = async (blueprintId: number) => {
     setIsAccepting(blueprintId);
+    setError(null);
     try {
-      const token = authService.getToken();
-      
-      const variantCheckResponse = await axios.post(
-        `${API_URL}/Printify/blueprints/${blueprintId}/variants/sync`,
+      const variantCheckResponse = await apiClient.post(
+        endpoints.printify.blueprints.syncVariants(blueprintId.toString()),
         {},
         {
           params: {
             printProviderId: 99
-          },
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
           }
         }
       );
 
       if (variantCheckResponse.status === 200) {
-        await axios.post(`${API_URL}/UserOfBlueprint`, {
-          userId: 1,
-          blueprintId: blueprintId
-        }, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+        const userId = getCurrentUserId();
+        await apiClient.post(endpoints.user.blueprints(userId), {
+          userId,
+          blueprintId
         });
 
         setSelectedBlueprints(prev => new Set([...prev, blueprintId]));
@@ -161,9 +142,9 @@ const PrintifyBlueprints = () => {
       console.error('Error accepting blueprint:', error);
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 500 && error.response?.data.includes('404')) {
-          alert('This blueprint is not available for the selected provider (99). Please choose another blueprint.');
+          setError('This blueprint is not available for the selected provider (99). Please choose another blueprint.');
         } else {
-          alert('An error occurred while adding the blueprint. Please try again.');
+          setError(handleApiError(error));
         }
       }
     } finally {

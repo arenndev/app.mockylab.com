@@ -1,25 +1,41 @@
 "use client";
-import React, { useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authService } from "@/services/authService";
+import { handleApiError } from '@/utils/apiConfig';
 
-const Login = () => {
+const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // If already authenticated, redirect to mockup list
+    if (authService.isAuthenticated()) {
+      router.push('/mockup/list');
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');  // Clear previous errors
+    setError(null);
+    setLoading(true);
+
     try {
-      await authService.login(username, password);
-      router.push('/mockup/list');
-    } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || "Login failed. Please check your credentials.");
+      const success = await authService.login(username, password);
+      if (success) {
+        const callbackUrl = searchParams.get('callbackUrl');
+        router.push(callbackUrl || '/mockup/list');
+      } else {
+        setError('Invalid credentials');
+      }
+    } catch (error) {
+      setError(handleApiError(error));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,15 +47,8 @@ const Login = () => {
             {/* Left Side - Logo and Welcome Message */}
             <div className="lg:w-1/2 p-12 bg-primary dark:bg-boxdark flex flex-col items-center justify-center text-white">
               <div className="text-center">
-                <Image
-                  src="/images/logo/logo.svg"
-                  alt="Logo"
-                  width={200}
-                  height={40}
-                  className="mx-auto mb-8"
-                  style={{ width: 'auto', height: 'auto' }}
-                />
-                <h2 className="text-3xl font-bold mb-4">Welcome to MockyLab</h2>
+                <h1 className="text-4xl font-bold mb-4">MockyLab</h1>
+                <h2 className="text-3xl font-bold mb-4">Welcome Back!</h2>
                 <p className="text-lg text-gray-100">
                   Your Professional Mockup Design Solution
                 </p>
@@ -90,9 +99,10 @@ const Login = () => {
 
                   <button
                     type="submit"
+                    disabled={loading}
                     className="w-full bg-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-boxdark"
                   >
-                    Sign In
+                    {loading ? 'Logging in...' : 'Login'}
                   </button>
                 </form>
               </div>
@@ -104,4 +114,4 @@ const Login = () => {
   );
 };
 
-export default Login; 
+export default LoginPage; 

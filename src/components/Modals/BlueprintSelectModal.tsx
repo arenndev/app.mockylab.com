@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { authService } from '../../services/authService';
-import { API_URL } from '@/utils/apiConfig';
+import { apiClient, endpoints, handleApiError, getCurrentUserId } from '@/utils/apiConfig';
 
 interface Blueprint {
     id: string;
@@ -48,27 +46,14 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
     const fetchBlueprints = async () => {
         setLoading(true);
         try {
-            const token = authService.getToken();
-            if (!token) {
-                setError('No auth token available');
-                return;
-            }
-            const response = await axios.get(`${API_URL}/UserOfBlueprint/user/1`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-
+            const userId = getCurrentUserId();
+            const response = await apiClient.get(endpoints.user.blueprints(userId));
+            
             // Fetch blueprint details for each user blueprint
             const detailedBlueprints = await Promise.all(
                 response.data.map(async (userBlueprint: { blueprintId: number }) => {
-                    const blueprintResponse = await axios.get(
-                        `${API_URL}/Printify/blueprints/${userBlueprint.blueprintId}`,
-                        {
-                            headers: {
-                                Authorization: `Bearer ${token}`
-                            }
-                        }
+                    const blueprintResponse = await apiClient.get(
+                        endpoints.printify.blueprints.details(userBlueprint.blueprintId.toString())
                     );
                     return blueprintResponse.data;
                 })
@@ -77,7 +62,7 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
             setBlueprints(detailedBlueprints);
         } catch (error) {
             console.error('Error fetching blueprints:', error);
-            setError('Failed to load blueprints');
+            setError(handleApiError(error));
         } finally {
             setLoading(false);
         }

@@ -7,6 +7,7 @@ import axios from 'axios';
 import { authService } from '@/services/authService';
 import { useRouter } from 'next/navigation';
 import { API_URL } from '@/utils/apiConfig';
+import Link from 'next/link';
 
 interface Blueprint {
   id: number;
@@ -131,12 +132,12 @@ const MyBlueprints = () => {
               <h2 className="text-xl font-semibold text-black dark:text-white">
                 My Selected Blueprints
               </h2>
-              <a
+              <Link
                 href="/printify/blueprints"
                 className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90"
               >
                 Add New Blueprint
-              </a>
+              </Link>
             </div>
 
             {/* Error Message */}
