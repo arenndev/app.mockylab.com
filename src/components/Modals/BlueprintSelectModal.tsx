@@ -1,24 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiClient, endpoints, handleApiError, getCurrentUserId } from '@/utils/apiConfig';
-
-interface Blueprint {
-    id: string;
-    title: string;
-    description: string;
-    brand: string;
-    model: string;
-    variants: BlueprintVariant[];
-    images: string[];
-}
-
-interface BlueprintVariant {
-    id: number;
-    variantId: number;
-    title: string;
-    options: Record<string, string>;
-}
+import { printifyService } from '@/services/printifyService';
+import { authService } from '@/services/authService';
+import type { Blueprint, BlueprintVariant } from '@/types/printify';
 
 interface Props {
     isOpen: boolean;
@@ -33,36 +18,27 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
     const [filters, setFilters] = useState({
         search: '',
         brand: '',
-        model: ''
     });
 
-    // Fetch blueprints
+    // Fetch user's blueprints
     useEffect(() => {
         if (isOpen) {
-            fetchBlueprints();
+            fetchUserBlueprints();
         }
     }, [isOpen]);
 
-    const fetchBlueprints = async () => {
+    const fetchUserBlueprints = async () => {
         setLoading(true);
         try {
-            const userId = getCurrentUserId();
-            const response = await apiClient.get(endpoints.user.blueprints(userId));
-            
-            // Fetch blueprint details for each user blueprint
-            const detailedBlueprints = await Promise.all(
-                response.data.map(async (userBlueprint: { blueprintId: number }) => {
-                    const blueprintResponse = await apiClient.get(
-                        endpoints.printify.blueprints.details(userBlueprint.blueprintId.toString())
-                    );
-                    return blueprintResponse.data;
-                })
-            );
-
-            setBlueprints(detailedBlueprints);
+            const userId = authService.getUserId();
+            if (!userId) {
+                throw new Error('User not found');
+            }
+            const response = await printifyService.getUserBlueprints(userId);
+            setBlueprints(response);
         } catch (error) {
-            console.error('Error fetching blueprints:', error);
-            setError(handleApiError(error));
+            console.error('Error fetching user blueprints:', error);
+            setError(error instanceof Error ? error.message : 'Failed to fetch blueprints');
         } finally {
             setLoading(false);
         }
@@ -70,16 +46,15 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
 
     // Filter blueprints
     const filteredBlueprints = blueprints.filter(blueprint => {
-        const searchMatch = blueprint.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-                          blueprint.description.toLowerCase().includes(filters.search.toLowerCase());
+        const searchMatch = !filters.search || 
+            blueprint.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+            blueprint.description.toLowerCase().includes(filters.search.toLowerCase());
         const brandMatch = !filters.brand || blueprint.brand.toLowerCase() === filters.brand.toLowerCase();
-        const modelMatch = !filters.model || blueprint.model.toLowerCase() === filters.model.toLowerCase();
-        return searchMatch && brandMatch && modelMatch;
+        return searchMatch && brandMatch;
     });
 
-    // Get unique brands and models for filters
+    // Get unique brands for filters
     const brands = [...new Set(blueprints.map(b => b.brand))];
-    const models = [...new Set(blueprints.map(b => b.model))];
 
     if (!isOpen) return null;
 
@@ -99,7 +74,7 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
                 </div>
 
                 {/* Filters */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
                         <input
                             type="text"
@@ -116,20 +91,8 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
                             className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
                         >
                             <option value="">All Brands</option>
-                            {brands.map(brand => (
-                                <option key={brand} value={brand}>{brand}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <select
-                            value={filters.model}
-                            onChange={(e) => setFilters(prev => ({ ...prev, model: e.target.value }))}
-                            className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
-                        >
-                            <option value="">All Models</option>
-                            {models.map(model => (
-                                <option key={model} value={model}>{model}</option>
+                            {brands.map((brand, index) => (
+                                <option key={index} value={brand}>{brand}</option>
                             ))}
                         </select>
                     </div>
@@ -141,6 +104,8 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
                         <div className="text-center py-4">Loading...</div>
                     ) : error ? (
                         <div className="text-danger text-center py-4">{error}</div>
+                    ) : filteredBlueprints.length === 0 ? (
+                        <div className="text-center py-4">No blueprints found. Please add blueprints from the Blueprints page.</div>
                     ) : (
                         <div className="grid grid-cols-2 gap-4">
                             {filteredBlueprints.map(blueprint => (
@@ -164,9 +129,6 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
                                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 {blueprint.brand} - {blueprint.model}
                                             </p>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                {blueprint.variants?.length || 0} variants
-                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -177,6 +139,6 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
             </div>
         </div>
     );
-};
+}
 
 export default BlueprintSelectModal; 

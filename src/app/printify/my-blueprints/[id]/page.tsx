@@ -3,52 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import axios from 'axios';
-import { authService } from '@/services/authService';
+import { printifyService } from '@/services/printifyService';
 import { useParams } from 'next/navigation';
-import { API_URL } from '@/utils/apiConfig';
-
-interface Blueprint {
-  id: number;
-  title: string;
-  description: string;
-  brand: string;
-  model: string;
-  images: string[];
-  printProviderId: number;
-}
-
-interface VariantResponse {
-  printProviderId: number;
-  title: string;
-  variants: BlueprintVariant[];
-  totalCount: number;
-  currentPage: number;
-  pageSize: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
-
-interface BlueprintVariant {
-  id: number;
-  blueprintId: number;
-  printProviderId: number;
-  variantId: number;
-  title: string;
-  options: any; // JSON formatted options
-  isActive: boolean;
-  placeholders: VariantPlaceholder[];
-}
-
-interface VariantPlaceholder {
-  id: number;
-  variantId: number;
-  position: string;
-  width: number;
-  height: number;
-  isActive: boolean;
-}
+import type { Blueprint, VariantResponse, BlueprintVariant, VariantPlaceholder } from '@/types/printify';
 
 const BlueprintDetail = () => {
   const params = useParams();
@@ -65,25 +22,14 @@ const BlueprintDetail = () => {
 
   const fetchBlueprint = async () => {
     try {
-      console.log('Fetching blueprint details for ID:', blueprintId);
-      const token = authService.getToken();
-      if (!token) {
-        console.error('No auth token found');
-        return null;
-      }
-      const response = await axios.get(`${API_URL}/Printify/blueprints/${blueprintId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      console.log('Blueprint API Response:', response.data);
-      setBlueprint(response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching blueprint:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('API Error Response:', error.response?.data);
+      const data = await printifyService.getBlueprintDetails(blueprintId);
+      setBlueprint(data);
+      return data;
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to fetch blueprint details');
       }
       return null;
     }
@@ -91,45 +37,29 @@ const BlueprintDetail = () => {
 
   const fetchVariants = async () => {
     try {
-      console.log('Fetching variants from database for blueprint:', blueprintId);
-      const token = authService.getToken();
-      if (!token) {
-        console.error('No auth token found');
-        return;
-      }
-      const response = await axios.get<VariantResponse>(
-        `${API_URL}/Printify/blueprints/${blueprintId}/variants`,
-        {
-          params: {
-            printProviderId: 99,
-            page,
-            pageSize
-          },
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      console.log('Database Variants Response:', response.data);
-      console.log('First variant details:', response.data.variants?.[0]);
+      const response = await printifyService.getBlueprintVariants(blueprintId, {
+        printProviderId: 99,
+        page,
+        pageSize
+      });
       
-      if (!response.data.variants || response.data.variants.length === 0) {
+      if (!response.variants || response.variants.length === 0) {
         setNeedsSync(true);
         setVariants(null);
       } else {
         setNeedsSync(false);
-        setVariants(response.data);
+        setVariants(response);
       }
-    } catch (error) {
-      console.error('Error fetching variants from database:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('API Error Response:', error.response?.data);
-        if (error.response?.status === 404 || error.response?.status === 500) {
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+        if (err.message.includes('404') || err.message.includes('500')) {
           setNeedsSync(true);
         }
-        setVariants(null);
+      } else {
+        setError('Failed to fetch variants');
       }
+      setVariants(null);
     } finally {
       setIsLoading(false);
     }
@@ -139,53 +69,15 @@ const BlueprintDetail = () => {
     setIsSyncing(true);
     setError(null);
     try {
-      console.log('Starting variant sync with Printify');
-      const token = authService.getToken();
-      if (!token) {
-        console.error('No auth token found');
-        setError('Authentication error. Please try logging in again.');
-        return;
-      }
-
-      const syncResponse = await axios.post(
-        `${API_URL}/Printify/blueprints/${blueprintId}/variants/sync`,
-        {},
-        {
-          params: {
-            printProviderId: 99
-          },
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      console.log('Printify Sync Response:', syncResponse.data);
-
+      await printifyService.syncBlueprintVariants(blueprintId, 99);
       await new Promise(resolve => setTimeout(resolve, 1000));
-
       setIsLoading(true);
       await fetchVariants();
-    } catch (error) {
-      console.error('Error during variant sync:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('API Error Response:', error.response?.data);
-        
-        // API key hatası
-        if (error.response?.status === 400 && error.response?.data.includes('API key not found')) {
-          alert('Printify API key not found. Please set it in the settings page.');
-          window.location.href = '/printify/settings';
-          return;
-        }
-        
-        // 404 hatası - Blueprint Printify'da bulunamadı
-        if (error.response?.status === 500 && error.response?.data.includes('404')) {
-          setError('This blueprint could not be found on Printify. It might have been deleted or is temporarily unavailable.');
-          return;
-        }
-
-        // Diğer hatalar
-        setError(error.response?.data || 'An error occurred while syncing variants.');
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to sync variants');
       }
     } finally {
       setIsSyncing(false);
@@ -222,6 +114,10 @@ const BlueprintDetail = () => {
                       alt={blueprint.title}
                       className="w-full rounded-lg object-cover"
                       loading="lazy"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/images/placeholder.jpg';
+                      }}
                     />
                   )}
                 </div>
@@ -263,7 +159,7 @@ const BlueprintDetail = () => {
                 <div className="flex items-center justify-center h-40">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                 </div>
-              ) : variants && variants.variants && variants.variants.length > 0 ? (
+              ) : variants ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {variants.variants.map((variant) => (

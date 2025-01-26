@@ -2,29 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
-import { API_URL } from '@/utils/apiConfig';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import BlueprintSelectModal from '@/components/Modals/BlueprintSelectModal';
 import VariantSelectModal from '@/components/Modals/VariantSelectModal';
 import { authService } from '@/services/authService';
+import { printifyService } from '@/services/printifyService';
+import type { Blueprint as PrintifyBlueprint, BlueprintVariant } from '@/types/printify';
 
-interface Blueprint {
-    id: string;
-    title: string;
-    description: string;
-    brand: string;
-    model: string;
+interface Blueprint extends PrintifyBlueprint {
     variants: BlueprintVariant[];
-    images: string[];
-}
-
-interface BlueprintVariant {
-    id: number;
-    variantId: number;
-    title: string;
-    options: Record<string, string>;
 }
 
 interface CreateProductForm {
@@ -39,6 +26,7 @@ interface CreateProductForm {
     }[];
     printifyImageId: string;
     catalogImageIds?: string[];
+    userId?: string;
 }
 
 const CreateProduct = () => {
@@ -70,85 +58,42 @@ const CreateProduct = () => {
     };
 
     // Blueprint seçimi
-    const handleBlueprintSelect = async (blueprint: Blueprint) => {
+    const handleBlueprintSelect = async (blueprint: PrintifyBlueprint) => {
         try {
-            const token = authService.getToken();
-            if (!token) {
-                setError('No auth token available');
-                return;
-            }
+            // Blueprint detaylarını al
+            const blueprintDetails = await printifyService.getBlueprintDetails(blueprint.id);
+            
+            // Variant'ları al
+            const variants = await printifyService.getBlueprintVariants(blueprint.id, {
+                printProviderId: 99,
+                page: 1,
+                pageSize: 100
+            });
 
-            // Önce blueprint detaylarını al
-            const blueprintResponse = await axios.get(
-                `${API_URL}/Printify/blueprints/${blueprint.id}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                        'accept': 'application/json'
-                    }
-                }
-            );
+            const updatedBlueprint: Blueprint = {
+                ...blueprintDetails,
+                variants: variants.variants || []
+            };
 
-            if (blueprintResponse.data) {
-                const blueprintDetails = blueprintResponse.data;
+            setSelectedBlueprint(updatedBlueprint);
+            setFormData(prev => ({
+                ...prev,
+                blueprintId: blueprint.id,
+                title: blueprintDetails.title,
+                description: blueprintDetails.description,
+                variants: []
+            }));
 
-                // Backend'den variant'ları al
-                const variantsResponse = await axios.get(
-                    `${API_URL}/Printify/blueprints/${blueprint.id}/variants`,
-                    {
-                        params: {
-                            printProviderId: 99,
-                            page: 1,
-                            pageSize: 100
-                        },
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json',
-                            'accept': 'application/json'
-                        }
-                    }
-                );
-
-                if (variantsResponse.data && variantsResponse.data.variants) {
-                    console.log('Variants from API:', variantsResponse.data.variants);
-                    const updatedBlueprint = {
-                        ...blueprintDetails,
-                        variants: variantsResponse.data.variants
-                    };
-                    console.log('Updated blueprint variants:', updatedBlueprint.variants);
-
-                    setSelectedBlueprint(updatedBlueprint);
-                    setFormData(prev => ({
-                        ...prev,
-                        blueprintId: parseInt(blueprint.id),
-                        title: blueprintDetails.title,
-                        description: blueprintDetails.description,
-                        variants: []
-                    }));
-
-                    setIsBlueprintModalOpen(false);
-                    setIsVariantModalOpen(true);
-                } else {
-                    throw new Error('No variants received');
-                }
-            } else {
-                throw new Error('Failed to fetch blueprint details');
-            }
+            setIsBlueprintModalOpen(false);
+            setIsVariantModalOpen(true);
         } catch (error) {
             console.error('Error fetching blueprint details:', error);
-            if (axios.isAxiosError(error)) {
-                const errorMessage = error.response?.data?.message || error.message;
-                setError('Failed to fetch blueprint details: ' + errorMessage);
-            } else {
-                setError('Failed to fetch blueprint details');
-            }
+            setError(error instanceof Error ? error.message : 'Failed to fetch blueprint details');
         }
     };
 
     // Variant seçimi
     const handleVariantsSelect = (variants: { variantId: number; price: number; isEnabled: boolean; }[]) => {
-        // Seçilen variant'ları formData'ya ekle
         setFormData(prev => ({
             ...prev,
             variants: variants.map(v => ({
@@ -167,49 +112,31 @@ const CreateProduct = () => {
         setError(null);
 
         try {
-            const token = authService.getToken();
-            if (!token) {
-                setError('No auth token available');
-                return;
-            }
-
             // Validate form data
             if (!formData.blueprintId) {
-                setError('Please select a blueprint');
-                return;
+                throw new Error('Please select a blueprint');
             }
 
             if (!formData.variants || formData.variants.length === 0) {
-                setError('Please select at least one variant');
-                return;
+                throw new Error('Please select at least one variant');
             }
 
-            // Create the request data
-            const requestData = {
+            if (!formData.printifyImageId) {
+                throw new Error('Please upload a product image');
+            }
+
+            const userId = authService.getCurrentUser()?.nameIdentifier;
+            if (!userId) {
+                throw new Error('User authentication error');
+            }
+
+            // Create product
+            const response = await printifyService.createProduct({
                 ...formData,
-                userId: authService.getCurrentUser()?.nameIdentifier || '1',
-                variants: formData.variants.map(v => ({
-                    variantId: v.variantId,
-                    price: v.price,
-                    isEnabled: v.isEnabled
-                }))
-            };
+                userId: userId
+            });
 
-            console.log('Creating product with data:', requestData);
-
-            const response = await axios.post(
-                `${API_URL}/Printify/products`,
-                requestData,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                        'accept': 'application/json'
-                    }
-                }
-            );
-
-            if (response.data.success) {
+            if (response.success) {
                 setFormData({
                     title: '',
                     description: '',
@@ -220,29 +147,13 @@ const CreateProduct = () => {
                 });
                 setSelectedBlueprint(null);
                 alert('Product created successfully!');
+                router.push('/printify/products');
             } else {
-                setError(response.data.message || 'Failed to create product');
+                throw new Error(response.message || 'Failed to create product');
             }
         } catch (error) {
             console.error('Error creating product:', error);
-            if (axios.isAxiosError(error)) {
-                const errorData = error.response?.data;
-                let errorMessage = 'An error occurred while creating the product';
-                
-                if (typeof errorData === 'string') {
-                    errorMessage = errorData;
-                } else if (errorData?.title) {
-                    errorMessage = errorData.title;
-                } else if (errorData?.message) {
-                    errorMessage = errorData.message;
-                } else if (errorData?.errors) {
-                    errorMessage = Object.values(errorData.errors).flat().join(', ');
-                }
-                
-                setError(errorMessage);
-            } else {
-                setError('An unexpected error occurred');
-            }
+            setError(error instanceof Error ? error.message : 'An unexpected error occurred');
         } finally {
             setLoading(false);
         }
@@ -400,89 +311,39 @@ const CreateProduct = () => {
                                 onChange={async (e) => {
                                     if (e.target.files && e.target.files[0]) {
                                         try {
-                                            const token = authService.getToken();
-                                            const currentUser = authService.getCurrentUser();
-                                            
-                                            if (!token) {
-                                                setError('No auth token available');
-                                                return;
+                                            const userId = authService.getCurrentUser()?.nameIdentifier;
+                                            if (!userId) {
+                                                throw new Error('No user information available');
                                             }
 
-                                            if (!currentUser) {
-                                                setError('No user information available');
-                                                return;
-                                            }
-
-                                            const formData = new FormData();
                                             const file = e.target.files[0];
-                                            
+                                            const formData = new FormData();
                                             formData.append('ImageFile', file);
                                             formData.append('FileName', file.name);
-                                            formData.append('UserId', currentUser.nameIdentifier || '1');
+                                            formData.append('UserId', userId);
 
-                                            console.log('Uploading file:', {
-                                                name: file.name,
-                                                size: file.size,
-                                                type: file.type
-                                            });
+                                            const response = await printifyService.uploadImage(formData);
 
-                                            // FormData içeriğini kontrol et
-                                            for (let pair of formData.entries()) {
-                                                console.log(pair[0] + ': ' + pair[1]);
+                                            if (!response.data || !response.success) {
+                                                throw new Error(response.message || 'Failed to upload image');
                                             }
 
-                                            const response = await axios.post(
-                                                `${API_URL}/PrintifyImage/upload`,
-                                                formData,
-                                                {
-                                                    headers: {
-                                                        'Authorization': `Bearer ${token}`,
-                                                        'accept': '*/*',
-                                                        'Content-Type': 'multipart/form-data'
-                                                    },
-                                                    transformRequest: [(data, headers) => {
-                                                        // Axios'un otomatik dönüşümünü engelle
-                                                        return data;
-                                                    }]
-                                                }
-                                            );
-
-                                            if (response.data.success) {
-                                                setFormData(prev => ({ 
-                                                    ...prev, 
-                                                    printifyImageId: response.data.data.printifyImageId 
-                                                }));
-                                                console.log('Upload successful:', response.data);
-                                            } else {
-                                                console.error('Upload failed:', response.data);
-                                                setError('Failed to upload image: ' + response.data.message);
+                                            const { printifyImageId } = response.data;
+                                            if (!printifyImageId) {
+                                                throw new Error('No printify image ID received');
                                             }
+
+                                            setFormData(prev => ({ 
+                                                ...prev, 
+                                                printifyImageId 
+                                            }));
                                         } catch (error) {
                                             console.error('Error uploading image:', error);
-                                            if (axios.isAxiosError(error)) {
-                                                const errorMessage = error.response?.data?.message || error.message;
-                                                console.error('Axios error details:', {
-                                                    status: error.response?.status,
-                                                    data: error.response?.data,
-                                                    headers: error.response?.headers,
-                                                    requestHeaders: error.config?.headers,
-                                                    requestData: error.config?.data
-                                                });
-
-                                                if (error.response?.status === 401) {
-                                                    setError('Authentication failed. Please try logging in again.');
-                                                } else if (error.response?.status === 400) {
-                                                    setError('Invalid file or request format: ' + (error.response?.data?.message || 'Please try again'));
-                                                } else {
-                                                    setError('Failed to upload image: ' + errorMessage);
-                                                }
-                                            } else {
-                                                setError('Failed to upload image');
-                                            }
+                                            setError(error instanceof Error ? error.message : 'Failed to upload image');
                                         }
                                     }
                                 }}
-                                className="w-full cursor-pointer rounded-lg border-[1.5px] border-stroke bg-transparent font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:py-3 file:px-5 file:hover:bg-primary file:hover:bg-opacity-10 focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white dark:focus:border-primary"
+                                className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:px-5 file:py-2 file:hover:bg-primary file:hover:bg-opacity-10 disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white"
                             />
                         </div>
 

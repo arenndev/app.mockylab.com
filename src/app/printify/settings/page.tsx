@@ -3,14 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import { apiClient, endpoints, handleApiError } from '@/utils/apiConfig';
+import { printifyService } from '@/services/printifyService';
+import type { PrintifySettings } from '@/types/printify';
 
-interface PrintifySettings {
-  printifyApiKey?: string;
-  shopId?: string;
-}
-
-const PrintifySettings = () => {
+const PrintifySettingsPage = () => {
   const [printifyApiKey, setPrintifyApiKey] = useState('');
   const [displayApiKey, setDisplayApiKey] = useState('');
   const [shopId, setShopId] = useState('');
@@ -21,17 +17,18 @@ const PrintifySettings = () => {
   useEffect(() => {
     const fetchPrintifySettings = async () => {
       try {
-        const response = await apiClient.get<PrintifySettings>(endpoints.user.printifySettings);
-        if (response.data.printifyApiKey) {
-          const apiKey = response.data.printifyApiKey;
-          setPrintifyApiKey(apiKey);
-          setDisplayApiKey(maskApiKey(apiKey));
+        const settings = await printifyService.getSettings();
+        if (settings.printifyApiKey) {
+          setPrintifyApiKey(settings.printifyApiKey);
+          setDisplayApiKey(maskApiKey(settings.printifyApiKey));
         }
-        if (response.data.shopId) {
-          setShopId(response.data.shopId);
+        if (settings.shopId) {
+          setShopId(settings.shopId);
         }
       } catch (error) {
-        setMessage({ text: handleApiError(error), type: 'error' });
+        if (error instanceof Error) {
+          setMessage({ text: error.message, type: 'error' });
+        }
       }
     };
 
@@ -49,15 +46,15 @@ const PrintifySettings = () => {
     
     setIsLoading(true);
     try {
-      await apiClient.post(endpoints.user.printifyApiKey, {
-        printifyApiKey
-      });
+      await printifyService.updateApiKey(printifyApiKey);
       setMessage({ text: 'API key updated successfully', type: 'success' });
       setDisplayApiKey(maskApiKey(printifyApiKey));
       setIsEditing(false);
       await syncShopId();
     } catch (error) {
-      setMessage({ text: handleApiError(error), type: 'error' });
+      if (error instanceof Error) {
+        setMessage({ text: error.message, type: 'error' });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -66,11 +63,15 @@ const PrintifySettings = () => {
   const syncShopId = async () => {
     setIsLoading(true);
     try {
-      const response = await apiClient.post<{ shopId: string }>(endpoints.user.shopId);
-      setShopId(response.data.shopId);
-      setMessage({ text: 'Shop ID synchronized successfully', type: 'success' });
+      const settings = await printifyService.getSettings();
+      if (settings.shopId) {
+        setShopId(settings.shopId);
+        setMessage({ text: 'Shop ID synchronized successfully', type: 'success' });
+      }
     } catch (error) {
-      setMessage({ text: handleApiError(error), type: 'error' });
+      if (error instanceof Error) {
+        setMessage({ text: error.message, type: 'error' });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -166,4 +167,4 @@ const PrintifySettings = () => {
   );
 };
 
-export default PrintifySettings; 
+export default PrintifySettingsPage; 

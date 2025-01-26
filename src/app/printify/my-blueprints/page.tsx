@@ -3,10 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import axios from 'axios';
+import { printifyService } from '@/services/printifyService';
 import { authService } from '@/services/authService';
 import { useRouter } from 'next/navigation';
-import { API_URL } from '@/utils/apiConfig';
 import Link from 'next/link';
 
 interface Blueprint {
@@ -34,67 +33,24 @@ const MyBlueprints = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBlueprintDetails = async (blueprintId: number, token: string, retryCount = 0): Promise<Blueprint | null> => {
-    try {
-      const response = await axios.get<Blueprint>(
-        `${API_URL}/Printify/blueprints/${blueprintId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      return response.data;
-    } catch (err) {
-      console.error(`Error fetching blueprint ${blueprintId}:`, err);
-      if (retryCount < 2) {
-        // 1 saniye bekle ve tekrar dene
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return fetchBlueprintDetails(blueprintId, token, retryCount + 1);
-      }
-      return null;
-    }
-  };
-
   const fetchUserBlueprints = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const token = authService.getToken();
-      if (!token) {
-        console.error('No auth token available');
-        return null;
+      const userId = authService.getUserId();
+      if (!userId) {
+        setError('User authentication error. Please login again.');
+        return;
       }
-      const response = await axios.get<UserBlueprint[]>(
-        `${API_URL}/UserOfBlueprint/user/1`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
 
-      // Her bir blueprint için detayları al (3 deneme hakkıyla)
-      const detailedBlueprints = await Promise.all(
-        response.data.map(async (userBlueprint) => {
-          const blueprint = await fetchBlueprintDetails(userBlueprint.blueprintId, token);
-          return {
-            ...userBlueprint,
-            blueprint: blueprint || {
-              id: userBlueprint.blueprintId,
-              title: 'Blueprint not found',
-              description: 'This blueprint may have been deleted or is temporarily unavailable.',
-              brand: 'Unknown',
-              model: 'Unknown',
-              images: []
-            }
-          };
-        })
-      );
-
-      setUserBlueprints(detailedBlueprints);
+      const blueprints = await printifyService.getUserBlueprints(userId);
+      setUserBlueprints(blueprints);
     } catch (err) {
-      setError('Failed to fetch blueprints');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to fetch blueprints');
+      }
       console.error('Error fetching user blueprints:', err);
     } finally {
       setIsLoading(false);
@@ -103,15 +59,14 @@ const MyBlueprints = () => {
 
   const handleRemoveBlueprint = async (id: number) => {
     try {
-      const token = authService.getToken();
-      await axios.delete(`${API_URL}/UserOfBlueprint/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      await printifyService.removeUserBlueprint(id);
       await fetchUserBlueprints(); // Refresh list after deletion
     } catch (err) {
-      setError('Failed to remove blueprint');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to remove blueprint');
+      }
       console.error('Error removing blueprint:', err);
     }
   };
@@ -185,15 +140,15 @@ const MyBlueprints = () => {
                             Model: {userBlueprint.blueprint?.model || 'N/A'}
                           </p>
                           <div className="flex flex-col gap-2">
-                            <button
-                              onClick={() => router.push(`/printify/my-blueprints/${userBlueprint.blueprintId}`)}
-                              className="w-full px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+                            <Link
+                              href={`/printify/my-blueprints/${userBlueprint.blueprintId}`}
+                              className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10"
                             >
                               View Details
-                            </button>
+                            </Link>
                             <button
                               onClick={() => handleRemoveBlueprint(userBlueprint.id)}
-                              className="w-full px-4 py-2 bg-danger text-white rounded hover:bg-danger/90 transition-colors"
+                              className="inline-flex items-center justify-center rounded-md bg-danger px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10"
                             >
                               Remove
                             </button>
@@ -218,6 +173,6 @@ const MyBlueprints = () => {
       </div>
     </DefaultLayout>
   );
-};
+}
 
 export default MyBlueprints; 

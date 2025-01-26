@@ -3,40 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
-import { apiClient, endpoints, handleApiError, getCurrentUserId } from '@/utils/apiConfig';
-import axios from 'axios';
-
-interface Blueprint {
-  id: number;
-  title: string;
-  description: string;
-  brand: string;
-  model: string;
-  images: string[];
-}
-
-interface BlueprintListResponse {
-  items: Blueprint[];
-  totalCount: number;
-  currentPage: number;
-  pageSize: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
-
-interface Filters {
-  search: string;
-  brand: string;
-  model: string;
-}
+import { printifyService } from '@/services/printifyService';
+import { authService } from '@/services/authService';
+import type { Blueprint, BlueprintListResponse } from '@/types/printify';
 
 const PrintifyBlueprints = () => {
-  const [filters, setFilters] = useState<Filters>({
-    search: '',
-    brand: '',
-    model: ''
-  });
+  const [search, setSearch] = useState('');
+  const [brand, setBrand] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [blueprints, setBlueprints] = useState<BlueprintListResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -49,20 +22,17 @@ const PrintifyBlueprints = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const queryParams = new URLSearchParams();
-      
-      if (filters.search) queryParams.append('search', filters.search);
-      if (filters.brand) queryParams.append('brand', filters.brand);
-      queryParams.append('page', page.toString());
-      queryParams.append('pageSize', pageSize.toString());
-
-      const response = await apiClient.get<BlueprintListResponse>(
-        `${endpoints.printify.blueprints.list}?${queryParams.toString()}`
-      );
-      setBlueprints(response.data);
+      const response = await printifyService.getBlueprints({
+        search,
+        brand,
+        page,
+        pageSize
+      });
+      setBlueprints(response);
     } catch (error) {
-      console.error('Error fetching blueprints:', error);
-      setError(handleApiError(error));
+      if (error instanceof Error) {
+        setError(error.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -75,42 +45,40 @@ const PrintifyBlueprints = () => {
   useEffect(() => {
     const fetchUserBlueprints = async () => {
       try {
-        const userId = getCurrentUserId();
-        const response = await apiClient.get(endpoints.user.blueprints(userId));
-        const userBlueprintIds: Set<number> = new Set(response.data.map((ub: { blueprintId: number }) => ub.blueprintId));
+        const userId = authService.getUserId() || '1';
+        const userBlueprints = await printifyService.getUserBlueprints(userId);
+        const userBlueprintIds = new Set(
+          userBlueprints.map((ub: { blueprintId: number }) => ub.blueprintId)
+        ) as Set<number>;
         setSelectedBlueprints(userBlueprintIds);
       } catch (error) {
-        console.error('Error fetching user blueprints:', error);
-        setError(handleApiError(error));
+        if (error instanceof Error) {
+          setError(error.message);
+        }
       }
     };
 
     fetchUserBlueprints();
   }, []);
 
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
   const handleSearch = () => {
     setPage(1);
     fetchBlueprints();
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-    fetchBlueprints();
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
-  const resetFilters = () => {
-    setFilters({
-      search: '',
-      brand: '',
-      model: ''
-    });
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const resetSearch = () => {
+    setSearch('');
+    setBrand('');
     setPage(1);
     fetchBlueprints();
   };
@@ -119,33 +87,18 @@ const PrintifyBlueprints = () => {
     setIsAccepting(blueprintId);
     setError(null);
     try {
-      const variantCheckResponse = await apiClient.post(
-        endpoints.printify.blueprints.syncVariants(blueprintId.toString()),
-        {},
-        {
-          params: {
-            printProviderId: 99
-          }
-        }
-      );
+      // Önce variant'ları senkronize et
+      await printifyService.syncBlueprintVariants(blueprintId.toString(), 99);
 
-      if (variantCheckResponse.status === 200) {
-        const userId = getCurrentUserId();
-        await apiClient.post(endpoints.user.blueprints(userId), {
-          userId,
-          blueprintId
-        });
+      // Blueprint'i kullanıcıya ekle
+      const userId = authService.getUserId() || '1';
+      await printifyService.addBlueprintToUser(userId, blueprintId);
 
-        setSelectedBlueprints(prev => new Set([...prev, blueprintId]));
-      }
+      // UI'ı güncelle
+      setSelectedBlueprints(prev => new Set([...prev, blueprintId]));
     } catch (error) {
-      console.error('Error accepting blueprint:', error);
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 500 && error.response?.data.includes('404')) {
-          setError('This blueprint is not available for the selected provider (99). Please choose another blueprint.');
-        } else {
-          setError(handleApiError(error));
-        }
+      if (error instanceof Error) {
+        setError(error.message);
       }
     } finally {
       setIsAccepting(null);
@@ -159,45 +112,40 @@ const PrintifyBlueprints = () => {
 
         <div className="grid grid-cols-1 gap-9">
           <div className="flex flex-col gap-9">
-            {/* Search and Filter Section */}
+            {/* Search Section */}
             <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
               <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
                 <div className="flex flex-col gap-4">
-                  <div className="flex flex-wrap gap-4">
-                    <input
-                      type="text"
-                      placeholder="Search in title, description or model..."
-                      value={filters.search}
-                      onChange={(e) => handleFilterChange('search', e.target.value)}
-                      className="w-full md:w-72 rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Filter by brand..."
-                      value={filters.brand}
-                      onChange={(e) => handleFilterChange('brand', e.target.value)}
-                      className="w-full md:w-72 rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Filter by model..."
-                      value={filters.model}
-                      onChange={(e) => handleFilterChange('model', e.target.value)}
-                      className="w-full md:w-72 rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input
+                        type="text"
+                        placeholder="Search in title, description or model..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Filter by brand..."
+                        value={brand}
+                        onChange={(e) => setBrand(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                      />
+                    </div>
                     <button
                       onClick={handleSearch}
-                      className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                      className="bg-primary text-white px-6 py-3 rounded-md hover:bg-primary/90 transition-colors whitespace-nowrap"
                     >
                       Search
                     </button>
                     <button
-                      onClick={resetFilters}
-                      className="bg-danger text-white px-4 py-2 rounded-md hover:bg-danger/90 transition-colors"
+                      onClick={resetSearch}
+                      className="bg-danger text-white px-4 py-3 rounded-md hover:bg-danger/90 transition-colors"
                     >
-                      Reset Filters
+                      Reset
                     </button>
                   </div>
                 </div>
@@ -207,6 +155,12 @@ const PrintifyBlueprints = () => {
             {/* Blueprints Grid */}
             <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
               <div className="p-6.5">
+                {error && (
+                  <div className="mb-4 p-4 rounded bg-danger/10 text-danger">
+                    {error}
+                  </div>
+                )}
+
                 {isLoading ? (
                   <div className="flex items-center justify-center h-40">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

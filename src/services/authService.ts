@@ -89,10 +89,8 @@ class AuthService {
         const currentTime = Date.now() / 1000;
         
         if (decodedToken.exp < currentTime) {
-          // Token expired, try to refresh
-          this.refreshToken().catch(() => {
-            this.logout();
-          });
+          // Token expired, remove it
+          this.logout();
           return null;
         }
         return token;
@@ -106,7 +104,16 @@ class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return this.getToken() !== null;
+    const token = this.getToken();
+    if (!token) return false;
+
+    try {
+      const decodedToken = jwtDecode<DecodedToken>(token);
+      const currentTime = Date.now() / 1000;
+      return decodedToken.exp > currentTime;
+    } catch {
+      return false;
+    }
   }
 
   getCurrentUser(): DecodedToken | null {
@@ -122,6 +129,11 @@ class AuthService {
     } catch {
       return null;
     }
+  }
+
+  getUserId(): string | null {
+    const currentUser = this.getCurrentUser();
+    return currentUser?.userId || null;
   }
 
   async refreshToken(): Promise<boolean> {

@@ -68,7 +68,40 @@
         "Select blueprint",
         "Sync variants",
         "Add to user blueprints"
-      ]
+      ],
+      "blueprints": {
+        "list_view": {
+          "pagination": true,
+          "search": true,
+          "filtering": true,
+          "error_handling": true
+        },
+        "detail_view": {
+          "variant_sync": true,
+          "variant_pagination": true,
+          "error_states": true
+        },
+        "my_blueprints": {
+          "structure": {
+            "maintain_user_data": true,
+            "merge_blueprint_details": true
+          },
+          "error_handling": {
+            "blueprint_not_found": true,
+            "api_errors": true
+          }
+        }
+      },
+      "settings": {
+        "api_key_management": {
+          "secure_storage": true,
+          "validation": true
+        },
+        "shop_management": {
+          "id_validation": true,
+          "connection_test": true
+        }
+      }
     },
     "mockup": {
       "generation_flow": [
@@ -229,5 +262,54 @@
       "Protected route redirection",
       "Clean logout with full cleanup"
     ]
+  },
+  "rules": {
+    "auth": {
+      "token_handling": {
+        "storage": ["localStorage", "cookies"],
+        "validation": {
+          "required": true,
+          "check_expiration": true,
+          "auto_logout": true
+        },
+        "refresh": {
+          "enabled": true,
+          "prevent_infinite_loop": true
+        }
+      }
+    },
+    "api_responses": {
+      "blueprint_handling": {
+        "maintain_original_structure": true,
+        "merge_details": true,
+        "error_handling": {
+          "provide_fallback": true,
+          "log_errors": true
+        }
+      },
+      "settings_handling": {
+        "validate_api_key": true,
+        "validate_shop_id": true,
+        "secure_storage": true
+      }
+    },
+    "type_safety": {
+      "strict_null_checks": true,
+      "no_implicit_any": true
+    },
+    "code_quality": {
+      "prevent_infinite_loops": true,
+      "handle_edge_cases": true,
+      "proper_error_handling": true
+    },
+    "components": {
+      "modals": {
+        "blueprint_select": {
+          "maintain_state": true,
+          "handle_selection": true,
+          "pagination": true
+        }
+      }
+    }
   }
 } 
