@@ -38,6 +38,15 @@
           "remove_background": "/Ideogram/remove-background",
           "download_image": "/Ideogram/download-image",
           "get_processed_image": "/Ideogram/get-processed-image"
+        },
+        "user_variants": {
+          "get": "/api/UserOfVariant/{id}",
+          "get_by_user": "/api/UserOfVariant/user/{userId}",
+          "get_by_blueprint": "/api/UserOfVariant/user/{userId}/blueprint/{blueprintId}",
+          "create": "/api/UserOfVariant",
+          "create_bulk": "/api/UserOfVariant/bulk",
+          "update": "/api/UserOfVariant/{id}",
+          "delete": "/api/UserOfVariant/{id}"
         }
       }
     }
@@ -100,6 +109,43 @@
         "shop_management": {
           "id_validation": true,
           "connection_test": true
+        }
+      },
+      "variants": {
+        "management": {
+          "modal": {
+            "search": true,
+            "pagination": true,
+            "grid_view": true,
+            "save_changes": true
+          },
+          "operations": {
+            "toggle_enabled": true,
+            "update_price": true,
+            "bulk_create": true
+          }
+        },
+        "user_variants": {
+          "structure": {
+            "id": "number",
+            "userId": "number",
+            "blueprintId": "number",
+            "variantId": "number",
+            "defaultPrice": "number",
+            "isEnabled": "boolean",
+            "isActive": "boolean",
+            "createdAt": "string",
+            "updatedAt": "string"
+          },
+          "endpoints": {
+            "get": "/api/UserOfVariant/{id}",
+            "get_by_user": "/api/UserOfVariant/user/{userId}",
+            "get_by_blueprint": "/api/UserOfVariant/user/{userId}/blueprint/{blueprintId}",
+            "create": "/api/UserOfVariant",
+            "create_bulk": "/api/UserOfVariant/bulk",
+            "update": "/api/UserOfVariant/{id}",
+            "delete": "/api/UserOfVariant/{id}"
+          }
         }
       }
     },
@@ -308,6 +354,13 @@
           "maintain_state": true,
           "handle_selection": true,
           "pagination": true
+        },
+        "variant_management": {
+          "search": true,
+          "pagination": true,
+          "grid_view": true,
+          "save_changes": true,
+          "error_handling": true
         }
       }
     }

@@ -88,7 +88,7 @@ const PrintifyBlueprints = () => {
     setError(null);
     try {
       // Önce variant'ları senkronize et
-      await printifyService.syncBlueprintVariants(blueprintId.toString(), 99);
+      await printifyService.syncBlueprintVariants(blueprintId, 99);
 
       // Blueprint'i kullanıcıya ekle
       const userId = authService.getUserId() || '1';
