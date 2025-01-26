@@ -64,23 +64,44 @@ const CreateProduct = () => {
     const handleBlueprintSelect = async (blueprint: PrintifyBlueprint) => {
         try {
             const blueprintDetails = await printifyService.getBlueprintDetails(blueprint.id);
-            const userId = authService.getCurrentUser()?.nameIdentifier;
+            const userId = authService.getUserId();
             
             if (!userId) {
                 throw new Error('User not authenticated');
             }
 
-            const userVariants = await printifyService.getUserVariantsByBlueprint(userId, blueprint.id);
+            // Önce tüm varyantları al
+            const allVariants = await printifyService.getBlueprintVariants(blueprint.id, {
+                printProviderId: 99,
+                page: 1,
+                pageSize: 1000
+            });
 
+            // Sonra kullanıcının varyantlarını al
+            const userVariants = await printifyService.getUserVariantsByBlueprint(userId.toString(), blueprint.id);
+
+            // Varyantları birleştir
             const updatedBlueprint: Blueprint = {
                 ...blueprintDetails,
-                variants: userVariants.map((uv: UserOfVariant) => ({
-                    ...uv,
-                    id: uv.variantId,
-                    price: uv.defaultPrice,
-                    isEnabled: uv.isEnabled
-                }))
+                variants: userVariants.map((uv: UserOfVariant) => {
+                    const variantDetails = allVariants.variants.find(v => v.variantId === uv.variantId);
+                    return {
+                        ...variantDetails,
+                        id: uv.variantId,
+                        price: uv.defaultPrice,
+                        isEnabled: uv.isEnabled
+                    };
+                })
             };
+
+            // Kullanıcının aktif varyantlarını form datasına ekle
+            const activeVariants = userVariants
+                .filter((uv: UserOfVariant) => uv.isEnabled)
+                .map((uv: UserOfVariant) => ({
+                    variantId: uv.variantId,
+                    price: uv.defaultPrice,
+                    isEnabled: true
+                }));
 
             setSelectedBlueprint(updatedBlueprint);
             setFormData(prev => ({
@@ -88,7 +109,7 @@ const CreateProduct = () => {
                 blueprintId: blueprint.id,
                 title: blueprintDetails.title,
                 description: blueprintDetails.description,
-                variants: []
+                variants: activeVariants
             }));
 
             setIsBlueprintModalOpen(false);
@@ -119,7 +140,7 @@ const CreateProduct = () => {
         setError(null);
 
         try {
-            // Validate form data
+            // Form validasyonu
             if (!formData.blueprintId) {
                 throw new Error('Please select a blueprint');
             }
@@ -128,18 +149,36 @@ const CreateProduct = () => {
                 throw new Error('Please select at least one variant');
             }
 
+            if (!formData.title.trim()) {
+                throw new Error('Please enter a product title');
+            }
+
+            if (!formData.description.trim()) {
+                throw new Error('Please enter a product description');
+            }
+
             if (!formData.printifyImageId) {
                 throw new Error('Please upload a product image');
             }
 
-            const userId = authService.getCurrentUser()?.nameIdentifier;
+            // Kullanıcı kontrolü
+            const userId = authService.getUserId();
             if (!userId) {
                 throw new Error('User authentication error');
             }
 
             // Create product
             const response = await printifyService.createProduct({
-                ...formData,
+                title: formData.title,
+                description: formData.description,
+                tags: formData.tags,
+                blueprintId: formData.blueprintId,
+                variants: formData.variants.map(v => ({
+                    variantId: v.variantId,
+                    price: v.price,
+                    isEnabled: v.isEnabled
+                })),
+                printifyImageId: formData.printifyImageId,
                 userId: userId
             });
 
@@ -312,46 +351,58 @@ const CreateProduct = () => {
                         {/* Image Upload */}
                         <div>
                             <label className="mb-2.5 block text-black dark:text-white">Product Image</label>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={async (e) => {
-                                    if (e.target.files && e.target.files[0]) {
-                                        try {
-                                            const userId = authService.getCurrentUser()?.nameIdentifier;
-                                            if (!userId) {
-                                                throw new Error('No user information available');
+                            <div className="flex flex-col gap-4">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={async (e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            try {
+                                                setLoading(true);
+                                                setError(null);
+                                                
+                                                const userId = authService.getUserId();
+                                                if (!userId) {
+                                                    throw new Error('No user information available');
+                                                }
+
+                                                const file = e.target.files[0];
+                                                const formData = new FormData();
+                                                formData.append('ImageFile', file);
+                                                formData.append('FileName', file.name);
+                                                formData.append('UserId', userId);
+
+                                                const response = await printifyService.uploadImage(formData);
+
+                                                if (!response.success || !response.data) {
+                                                    throw new Error(response.message || 'Failed to upload image');
+                                                }
+
+                                                const { printifyImageId } = response.data;
+                                                if (!printifyImageId) {
+                                                    throw new Error('No printify image ID received');
+                                                }
+
+                                                setFormData(prev => ({ 
+                                                    ...prev, 
+                                                    printifyImageId
+                                                }));
+                                            } catch (error) {
+                                                console.error('Error uploading image:', error);
+                                                setError(error instanceof Error ? error.message : 'Failed to upload image');
+                                            } finally {
+                                                setLoading(false);
                                             }
-
-                                            const file = e.target.files[0];
-                                            const formData = new FormData();
-                                            formData.append('ImageFile', file);
-                                            formData.append('FileName', file.name);
-                                            formData.append('UserId', userId);
-
-                                            const response = await printifyService.uploadImage(formData);
-
-                                            if (!response.data || !response.success) {
-                                                throw new Error(response.message || 'Failed to upload image');
-                                            }
-
-                                            const { printifyImageId } = response.data;
-                                            if (!printifyImageId) {
-                                                throw new Error('No printify image ID received');
-                                            }
-
-                                            setFormData(prev => ({ 
-                                                ...prev, 
-                                                printifyImageId 
-                                            }));
-                                        } catch (error) {
-                                            console.error('Error uploading image:', error);
-                                            setError(error instanceof Error ? error.message : 'Failed to upload image');
                                         }
-                                    }
-                                }}
-                                className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:px-5 file:py-2 file:hover:bg-primary file:hover:bg-opacity-10 disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white"
-                            />
+                                    }}
+                                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:px-5 file:py-2 file:hover:bg-primary file:hover:bg-opacity-10 disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white"
+                                />
+                                {formData.printifyImageId && (
+                                    <div className="text-sm text-success">
+                                        Image uploaded successfully
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Submit Button */}

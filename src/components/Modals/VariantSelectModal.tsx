@@ -105,13 +105,21 @@ const VariantSelectModal = ({ isOpen, onClose, variants, selectedVariants, onVar
         setLocalVariants(prev => {
             const index = prev.findIndex(v => v.variantId === variant.variantId);
             if (index >= 0) {
+                // Varyant zaten listede var
                 const newVariants = [...prev];
-                newVariants[index] = {
-                    ...newVariants[index],
-                    isEnabled: !newVariants[index].isEnabled
-                };
-                return newVariants;
+                if (newVariants[index].isEnabled) {
+                    // Varyant aktifse, listeden çıkar
+                    return newVariants.filter(v => v.variantId !== variant.variantId);
+                } else {
+                    // Varyant pasifse, aktif yap
+                    newVariants[index] = {
+                        ...newVariants[index],
+                        isEnabled: true
+                    };
+                    return newVariants;
+                }
             }
+            // Varyant listede yoksa, ekle
             return [...prev, {
                 variantId: variant.variantId,
                 price: 30.00,
