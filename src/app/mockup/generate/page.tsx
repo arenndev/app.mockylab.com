@@ -6,13 +6,11 @@ import { authService } from "@/services/authService";
 import axios from 'axios';
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Image from "next/image";
-import { API_URL } from "@/utils/apiConfig";
-
-enum DesignColor {
-  Black = "Black",
-  White = "White",
-  Color = "Color"
-}
+import { API_URL, apiClient, endpoints, getCurrentUserId } from "@/utils/apiConfig";
+import { generateService, DesignColor, type Mockup, DesignArea, getDesignColorText } from "@/services/generateService";
+import { useFileUpload, type FileWithPreview } from "@/hooks/useFileUpload";
+import { toast } from 'react-toastify';
+import { jwtDecode } from "jwt-decode";
 
 interface FavoriteList {
   id: number;
@@ -22,32 +20,19 @@ interface FavoriteList {
   mockups: Mockup[];
 }
 
-interface Mockup {
-  id: number;
-  name: string;
-  backgroundImagePreviewPath: string;
-  designAreas: DesignArea[];
-  category?: string;
-  genderCategory?: string;
-  sizeCategory?: string;
-  designColor?: string;
-}
-
-interface DesignArea {
-  id: number;
-  name: string;
-  width: number;
-  height: number;
-  angle: number;
-  centerX: number;
-  centerY: number;
-}
-
-interface DesignFile {
+interface DesignFileWithPreview {
   designAreaId: number;
-  designFile: File | null;
   mockupId: number;
-  designColor: string;
+  designColor: DesignColor;
+  file: File | null;
+  previewUrl?: string;
+}
+
+interface SingleImageUpload {
+  mockupId: number;
+  designColor: DesignColor;
+  file: File | null;
+  previewUrl?: string;
 }
 
 interface QuickSelectModalProps {
@@ -62,17 +47,6 @@ interface DesignAreaUploadProps {
   mockupId: number;
   file: File | null;
   onChange: (designAreaId: number, mockupId: number, file: File | null) => void;
-}
-
-interface DesignFileWithPreview extends DesignFile {
-  previewUrl?: string;
-}
-
-interface SingleImageUpload {
-  mockupId: number;
-  file: File | null;
-  previewUrl?: string;
-  designColor: string;
 }
 
 const formatImagePath = (path: string) => {
@@ -329,28 +303,12 @@ const DesignAreaUpload = ({ area, mockupId, file, onChange }: DesignAreaUploadPr
   );
 };
 
-const ColorSelect = ({ value, onChange, mockupColor }: { value: string, onChange: (value: string) => void, mockupColor?: string }) => {
-  return (
-    <div>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded border-[1.5px] border-stroke bg-transparent px-3 py-2 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input"
-      >
-        <option value={DesignColor.Black}>Black</option>
-        <option value={DesignColor.White}>White</option>
-        <option value={DesignColor.Color}>Color</option>
-      </select>
-    </div>
-  );
-};
-
 const MockupCard = ({ mockup, singleImageUpload, onSingleImageUpload, designFiles, onDesignFileChange }: {
   mockup: Mockup;
   singleImageUpload?: SingleImageUpload;
-  onSingleImageUpload: (mockupId: number, file: File | null, designColor: string) => void;
+  onSingleImageUpload: (mockupId: number, file: File | null, designColor: DesignColor) => void;
   designFiles: DesignFileWithPreview[];
-  onDesignFileChange: (designAreaId: number, mockupId: number, file: File | null, designColor: string) => void;
+  onDesignFileChange: (designAreaId: number, mockupId: number, file: File | null, designColor: DesignColor) => void;
 }) => {
   const [showIndividualUploads, setShowIndividualUploads] = useState(false);
 
@@ -372,17 +330,10 @@ const MockupCard = ({ mockup, singleImageUpload, onSingleImageUpload, designFile
           <p className="text-sm text-gray-500">
             {mockup.designAreas?.length} design areas
           </p>
-          <div className="flex items-center gap-1 text-sm text-gray-500">
-            Design Color: {mockup.designColor}
-            {singleImageUpload?.file && ((mockup.designColor === DesignColor.Black && singleImageUpload?.designColor !== DesignColor.Black) ||
-              (mockup.designColor === DesignColor.White && singleImageUpload?.designColor !== DesignColor.White) ||
-              (mockup.designColor === DesignColor.Color && singleImageUpload?.designColor !== DesignColor.Color)) && (
-              <div className="tooltip" title="Warning: Design color does not match mockup color">
-                <svg className="w-4 h-4 text-meta-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-            )}
+          <div className="flex items-center gap-1 text-sm">
+            <span className="text-gray-500">
+              Design Color: {getDesignColorText(mockup.designColor)}
+            </span>
           </div>
         </div>
         {mockup.designAreas.length > 1 && (
@@ -413,8 +364,7 @@ const MockupCard = ({ mockup, singleImageUpload, onSingleImageUpload, designFile
                     accept="image/*"
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;
-                      const currentColor = designFile?.designColor || DesignColor.Color;
-                      onDesignFileChange(area.id, mockup.id, file, currentColor);
+                      onDesignFileChange(area.id, mockup.id, file, mockup.designColor);
                     }}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   />
@@ -430,7 +380,7 @@ const MockupCard = ({ mockup, singleImageUpload, onSingleImageUpload, designFile
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onDesignFileChange(area.id, mockup.id, null, designFile.designColor);
+                            onDesignFileChange(area.id, mockup.id, null, mockup.designColor);
                           }}
                           className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
                         >
@@ -449,55 +399,53 @@ const MockupCard = ({ mockup, singleImageUpload, onSingleImageUpload, designFile
                     )}
                   </div>
                 </div>
-                {designFile?.designFile && (
-                  <div>
-                    <ColorSelect
-                      value={designFile.designColor}
-                      onChange={(color) => onDesignFileChange(area.id, mockup.id, designFile.designFile, color)}
-                      mockupColor={mockup.designColor}
-                    />
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
       ) : (
         // Single Design Upload
-        <>
-          {/* Design Preview */}
-          {singleImageUpload?.previewUrl && (
-            <div className="relative h-[200px] rounded-lg overflow-hidden bg-black/5">
-              <Image
-                src={singleImageUpload.previewUrl}
-                alt="Design Preview"
-                fill
-                className="object-contain"
-              />
-              <button
-                onClick={() => onSingleImageUpload(mockup.id, null, singleImageUpload.designColor)}
-                className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        <div className="relative">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              onSingleImageUpload(mockup.id, file, mockup.designColor);
+            }}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+          />
+          <div className="h-[120px] rounded-lg border-2 border-dashed border-stroke bg-transparent p-4 font-medium outline-none transition hover:border-primary focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary flex flex-col items-center justify-center gap-2">
+            {singleImageUpload?.previewUrl ? (
+              <div className="relative w-full h-full">
+                <Image
+                  src={singleImageUpload.previewUrl}
+                  alt="Design Preview"
+                  fill
+                  className="object-contain"
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSingleImageUpload(mockup.id, null, mockup.designColor);
+                  }}
+                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-meta-1 text-white rounded-full hover:bg-opacity-90"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <>
+                <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-              </button>
-            </div>
-          )}
-
-          {/* Color Selection */}
-          <div className="mt-4">
-            <ColorSelect
-              value={singleImageUpload?.designColor || mockup.designColor || DesignColor.Color}
-              onChange={(color) => {
-                if (singleImageUpload?.file) {
-                  onSingleImageUpload(mockup.id, singleImageUpload.file, color);
-                }
-              }}
-              mockupColor={mockup.designColor}
-            />
+                <span className="text-sm text-gray-500">Click to upload design</span>
+              </>
+            )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -507,274 +455,191 @@ const GeneratePage = () => {
   const router = useRouter();
   const [lists, setLists] = useState<FavoriteList[]>([]);
   const [selectedListId, setSelectedListId] = useState<number | null>(null);
-  const [designFiles, setDesignFiles] = useState<DesignFileWithPreview[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [mockups, setMockups] = useState<Mockup[]>([]);
   const [selectedMockups, setSelectedMockups] = useState<Mockup[]>([]);
   const [isQuickSelectOpen, setIsQuickSelectOpen] = useState(false);
-  const [singleImageUploads, setSingleImageUploads] = useState<SingleImageUpload[]>([]);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
-  const fetchLists = async () => {
-    try {
-      const token = authService.getToken();
-      if (!token) {
-        console.error("No token found in fetchLists");
-        router.push('/login');
-        return;
-      }
+  const designFileUpload = useFileUpload({
+    maxSizeInMB: 10,
+    acceptedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    onError: (error) => toast.error(error)
+  });
 
-      const user = authService.getCurrentUser();
-      if (!user?.userId) {
-        console.error("User ID not found in fetchLists");
-        router.push('/login');
-        return;
-      }
+  const singleFileUpload = useFileUpload({
+    maxSizeInMB: 10,
+    acceptedFileTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    onError: (error) => toast.error(error)
+  });
 
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      console.log('Fetching lists for user:', user.userId);
-      const response = await axios.get(`${API_URL}/Favorite/${user.userId}/lists`);
-      console.log('Lists response:', response.data);
+  const getDesignFiles = (): DesignFileWithPreview[] => {
+    return Array.from(designFileUpload.files.entries()).map(([key, fileData]) => {
+      const [mockupId, designAreaId] = key.split('-').map(Number);
+      return {
+        file: fileData.file,
+        previewUrl: fileData.previewUrl,
+        mockupId,
+        designAreaId,
+        designColor: mockups.find(m => m.id === mockupId)?.designColor || DesignColor.Color
+      };
+    });
+  };
 
-      let newLists: FavoriteList[] = [];
-      
-      if (Array.isArray(response.data)) {
-        newLists = response.data;
-      } else if (response.data.success && Array.isArray(response.data.data)) {
-        newLists = response.data.data;
-      }
-
-      // Mockup bilgilerini güncelle
-      if (mockups.length > 0) {
-        newLists = newLists.map(list => ({
-          ...list,
-          mockups: list.mockups.map(mockup => {
-            const fullMockup = mockups.find(m => m.id === mockup.id);
-            return {
-              ...mockup,
-              ...fullMockup, // Tüm mockup bilgilerini birleştir
-              backgroundImagePreviewPath: fullMockup?.backgroundImagePreviewPath || mockup.backgroundImagePreviewPath || ''
-            };
-          })
-        }));
-      }
-
-      console.log('Processed lists:', newLists);
-      setLists(newLists);
-    } catch (error) {
-      console.error("Error fetching lists:", error);
-    }
+  const getSingleImageUploads = (): SingleImageUpload[] => {
+    return Array.from(singleFileUpload.files.entries()).map(([key, fileData]) => {
+      const mockupId = Number(key.replace('single-', ''));
+      return {
+        file: fileData.file,
+        previewUrl: fileData.previewUrl,
+        mockupId,
+        designColor: mockups.find(m => m.id === mockupId)?.designColor || DesignColor.Color
+      };
+    });
   };
 
   const fetchMockups = async () => {
     try {
-      const token = authService.getToken();
-      if (!token) return;
-
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const response = await axios.get(`${API_URL}/Mockup`);
-      if (response.data.success) {
-        setMockups(response.data.data);
-      }
+      const data = await generateService.getMockups();
+      console.log('Fetched mockups:', data);
+      console.log('First mockup design color:', data[0]?.designColor);
+      setMockups(data);
     } catch (error) {
-      console.error("Error fetching mockups:", error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      }
     }
   };
 
-  const handleFileChange = (designAreaId: number, mockupId: number, file: File | null, designColor: string) => {
-    setDesignFiles(prev => {
-      // Clean up old preview URL if exists
-      const existingFile = prev.find(df => df.designAreaId === designAreaId && df.mockupId === mockupId);
-      if (existingFile?.previewUrl) {
-        URL.revokeObjectURL(existingFile.previewUrl);
-      }
+  const fetchLists = async () => {
+    try {
+      const userId = getCurrentUserId();
+      const response = await apiClient.get(endpoints.favorite.lists.list(userId));
+      console.log('Favorite Lists Response:', response.data);
+      
+      if (response.data.success) {
+        // Ensure we have the full mockup data before normalizing
+        if (mockups.length === 0) {
+          await fetchMockups();
+        }
 
-      // Create new preview URL if file exists
-      const previewUrl = file ? URL.createObjectURL(file) : undefined;
+        const listsWithMockups = response.data.data.map((list: any) => {
+          const normalizedMockups = list.mockups.map((mockup: any) => {
+            // Find the full mockup data from the API
+            const fullMockup = mockups.find(m => m.id === mockup.id);
+            
+            if (fullMockup) {
+              // Merge the data, prioritizing the API data
+              return {
+                ...mockup,
+                ...fullMockup,
+                // Ensure designAreas are preserved from the favorite list
+                designAreas: mockup.designAreas
+              };
+            }
+            
+            return mockup;
+          });
 
-      if (existingFile) {
-        return prev.map(df =>
-          df.designAreaId === designAreaId && df.mockupId === mockupId
-            ? { ...df, designFile: file, previewUrl, designColor }
-            : df
-        );
+          return {
+            ...list,
+            mockups: normalizedMockups
+          };
+        });
+        
+        setLists(listsWithMockups);
       }
-      return [...prev, { designAreaId, mockupId, designFile: file, previewUrl, designColor }];
-    });
+    } catch (error) {
+      console.error('Fetch Lists Error:', error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      }
+    }
   };
 
-  // Update single image upload handler
-  const handleSingleImageUpload = (mockupId: number, file: File | null, designColor: string) => {
-    setSingleImageUploads(prev => {
-      // Clean up old preview URL if exists
-      const existingUpload = prev.find(u => u.mockupId === mockupId);
-      if (existingUpload?.previewUrl) {
-        URL.revokeObjectURL(existingUpload.previewUrl);
-      }
+  const handleFileChange = (designAreaId: number, mockupId: number, file: File | null, designColor: DesignColor) => {
+    const key = `${mockupId}-${designAreaId}`;
+    designFileUpload.addFile(key, file);
+  };
 
-      // Create new preview URL if file exists
-      const previewUrl = file ? URL.createObjectURL(file) : undefined;
-
-      if (existingUpload) {
-        return prev.map(u =>
-          u.mockupId === mockupId
-            ? { ...u, file, previewUrl, designColor }
-            : u
-        );
-      }
-      return [...prev, { mockupId, file, previewUrl, designColor }];
-    });
+  const handleSingleImageUpload = (mockupId: number, file: File | null, designColor: DesignColor) => {
+    const key = `single-${mockupId}`;
+    singleFileUpload.addFile(key, file);
 
     // Clear individual design area uploads for this mockup
-    setDesignFiles(prev => prev.filter(df => df.mockupId !== mockupId));
+    mockups.find(m => m.id === mockupId)?.designAreas.forEach(area => {
+      const areaKey = `${mockupId}-${area.id}`;
+      designFileUpload.removeFile(areaKey);
+    });
   };
-
-  // Clean up preview URLs when component unmounts
-  useEffect(() => {
-    return () => {
-      designFiles.forEach(df => {
-        if (df.previewUrl) {
-          URL.revokeObjectURL(df.previewUrl);
-        }
-      });
-      singleImageUploads.forEach(upload => {
-        if (upload.previewUrl) {
-          URL.revokeObjectURL(upload.previewUrl);
-        }
-      });
-    };
-  }, [designFiles, singleImageUploads]);
 
   const handleGenerate = async () => {
     try {
-      // Token kontrolü
-      const token = authService.getToken();
-      if (!token) {
-        alert("Oturum süreniz dolmuş. Lütfen yeniden giriş yapın.");
-        router.push('/login');
-        return;
-      }
-
-      // Kontrolleri yapalım
+      console.log('handleGenerate started');
+      
       if (!mocksToShow.length) {
-        alert("Lütfen mockup seçin veya bir liste seçin.");
+        toast.error("Please select mockups first");
         return;
       }
 
-      // Debug için mockup sayılarını loglayalım
-      console.log('Toplam seçili mockup sayısı:', mocksToShow.length);
-      let mockupsWithDesigns = 0;
+      console.log('Mockups to process:', mocksToShow);
 
-      const hasAnyDesignFile = mocksToShow.some(mockup => {
-        // Tek resim yükleme kontrolü
-        const hasSingleUpload = singleImageUploads.some(u => u.mockupId === mockup.id && u.file);
-        // Design area bazlı yükleme kontrolü
-        const hasDesignAreaUploads = mockup.designAreas.every(area => 
-          designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
-        );
-        return hasSingleUpload || hasDesignAreaUploads;
+      const request = {
+        mockupIds: mocksToShow.map(m => m.id),
+        designAreaIds: [] as number[],
+        designColors: [] as DesignColor[],
+        designFiles: [] as File[]
+      };
+
+      console.log('Initial request:', request);
+
+      // Process each mockup
+      mocksToShow.forEach(mockup => {
+        const singleUpload = singleFileUpload.getFile(`single-${mockup.id}`);
+        console.log(`Processing mockup ${mockup.id}, single upload:`, singleUpload);
+        
+        if (singleUpload?.file) {
+          mockup.designAreas.forEach(area => {
+            request.designAreaIds.push(area.id);
+            request.designColors.push(mockup.designColor);
+            request.designFiles.push(singleUpload.file!);
+          });
+        } else {
+          // Check individual uploads
+          mockup.designAreas.forEach(area => {
+            const areaFile = designFileUpload.getFile(`${mockup.id}-${area.id}`);
+            console.log(`Checking area ${area.id} file:`, areaFile);
+            if (areaFile?.file) {
+              request.designAreaIds.push(area.id);
+              request.designColors.push(mockup.designColor);
+              request.designFiles.push(areaFile.file);
+            }
+          });
+        }
       });
 
-      if (!hasAnyDesignFile) {
-        alert("Lütfen en az bir tasarım yükleyin. Her mockup için ya tek bir tasarım ya da tüm design area'lar için ayrı tasarımlar yüklemelisiniz.");
+      console.log('Final request:', request);
+
+      if (request.designFiles.length === 0) {
+        toast.error("Please upload at least one design");
         return;
       }
 
       setIsGenerating(true);
-
-      const formData = new FormData();
-      const skippedMockups: number[] = [];
+      const formData = generateService.prepareFormData(request);
+      console.log('FormData prepared:', formData);
       
-      // Add mockupIds and track which ones are actually being sent
-      mocksToShow.forEach(mockup => {
-        const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
-        const hasAllDesignAreas = mockup.designAreas.every(area =>
-          designFiles.some(df => df.designAreaId === area.id && df.mockupId === mockup.id && df.designFile)
-        );
-
-        if (singleUpload?.file || hasAllDesignAreas) {
-          formData.append('mockupIds', mockup.id.toString());
-          mockupsWithDesigns++;
-        } else {
-          skippedMockups.push(mockup.id);
-        }
-      });
-
-      // Add design files and their corresponding area IDs and colors
-      mocksToShow.forEach(mockup => {
-        const singleUpload = singleImageUploads.find(u => u.mockupId === mockup.id);
-        
-        if (singleUpload?.file) {
-          // Tek resim yüklemesi varsa, tüm design area'lar için onu kullan
-          mockup.designAreas.forEach(area => {
-            formData.append('designAreaIds', area.id.toString());
-            formData.append('designColors', singleUpload.designColor);
-            if (singleUpload.file) {
-              formData.append('designFiles', singleUpload.file);
-            }
-          });
-        } else {
-          // Design area bazlı yüklemeleri kontrol et
-          mockup.designAreas.forEach(area => {
-            const designFile = designFiles.find(df => 
-              df.designAreaId === area.id && 
-              df.mockupId === mockup.id && 
-              df.designFile
-            );
-            if (designFile?.designFile) {
-              formData.append('designAreaIds', area.id.toString());
-              formData.append('designColors', designFile.designColor);
-              formData.append('designFiles', designFile.designFile);
-            }
-          });
-        }
-      });
-
-      // Log final formData contents for debugging
-      console.log('FormData contents:');
-      console.log('mockupIds:', Array.from(formData.getAll('mockupIds')));
-      console.log('designAreaIds:', Array.from(formData.getAll('designAreaIds')));
-      console.log('designColors:', Array.from(formData.getAll('designColors')));
-      console.log('designFiles count:', formData.getAll('designFiles').length);
-
-      // Token'ı her request öncesi yeniden al ve header'a ekle
-      const currentToken = authService.getToken();
-      if (!currentToken) {
-        throw new Error("Token not found");
-      }
-
-      const response = await axios.post(
-        `${API_URL}/Mockup/generate`,
-        formData,
-        {
-          responseType: 'blob',
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${currentToken}`
-          }
-        }
-      );
-
-      // Create a download link for the ZIP file
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'generated-mockups.zip');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const blob = await generateService.generateMockups(formData);
+      console.log('Response received:', blob);
+      
+      generateService.downloadGeneratedFile(blob);
+      toast.success("Mockups generated successfully!");
     } catch (error) {
-      console.error("Error generating mockups:", error);
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) {
-          alert("Oturum süreniz dolmuş. Lütfen yeniden giriş yapın.");
-          router.push('/login');
-          return;
-        }
-        const responseData = await error.response?.data?.text?.();
-        console.error("Server error details:", responseData);
-        alert("Mockup oluşturulurken bir hata oluştu. Lütfen tüm design area'lar için tasarım yüklediğinizden emin olun.");
+      console.error('Generate error:', error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("An unexpected error occurred");
       }
     } finally {
       setIsGenerating(false);
@@ -784,41 +649,25 @@ const GeneratePage = () => {
   useEffect(() => {
     const token = authService.getToken();
     if (token) {
-      fetchMockups();
-      fetchLists(); // İlk yüklemede her ikisini de çağır
+      fetchMockups().then(() => {
+        fetchLists();
+      });
     } else {
       router.push('/login');
     }
   }, []);
 
-  // Mockups değiştiğinde listeleri güncelle
+  // Cleanup on unmount
   useEffect(() => {
-    if (mockups.length > 0 && lists.length > 0) {
-      fetchLists();
-    }
-  }, [mockups]);
+    return () => {
+      designFileUpload.clearFiles();
+      singleFileUpload.clearFiles();
+    };
+  }, []);
 
   // Favori liste ve mockup seçimi kontrolü
   const selectedList = lists.find(list => list.id === selectedListId);
   const mocksToShow = selectedListId && selectedList?.mockups ? selectedList.mockups : selectedMockups;
-
-  // Add new handler for bulk uploads
-  const handleBulkUpload = (file: File | null, designColor: string) => {
-    if (!file) return;
-
-    // Apply to mockups based on design color
-    mocksToShow.forEach(mockup => {
-      // Apply designs to mockups with matching colors
-      const shouldApply = 
-        designColor === DesignColor.Color || // Color designs can go to any mockup
-        (designColor === DesignColor.White && mockup.designColor === DesignColor.White) ||
-        (designColor === DesignColor.Black && mockup.designColor === DesignColor.Black);
-
-      if (shouldApply) {
-        handleSingleImageUpload(mockup.id, file, designColor);
-      }
-    });
-  };
 
   return (
     <DefaultLayout>
@@ -826,6 +675,86 @@ const GeneratePage = () => {
         <Breadcrumb pageName="Generate Mockups" />
         
         <div className="flex flex-col gap-6">
+          {/* Bulk Upload Section */}
+          <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark flex items-center justify-between cursor-pointer"
+              onClick={() => setIsBulkUploadOpen(!isBulkUploadOpen)}
+            >
+              <h3 className="font-medium text-black dark:text-white">
+                Bulk Upload (Optional)
+              </h3>
+              <svg
+                className={`w-5 h-5 transition-transform ${isBulkUploadOpen ? 'transform rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+            {isBulkUploadOpen && (
+              <div className="p-6.5">
+                {/* Black Design Upload */}
+                <div className="mb-4.5">
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Upload Black Design
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      mocksToShow
+                        .filter(mockup => mockup.designColor === DesignColor.Black)
+                        .forEach(mockup => {
+                          handleSingleImageUpload(mockup.id, file, DesignColor.Black);
+                        });
+                    }}
+                    className="w-full cursor-pointer rounded-lg border-2 border-stroke bg-transparent outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:font-medium file:text-white hover:file:cursor-pointer hover:file:bg-opacity-90"
+                  />
+                </div>
+
+                {/* White Design Upload */}
+                <div className="mb-4.5">
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Upload White Design
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      mocksToShow
+                        .filter(mockup => mockup.designColor === DesignColor.White)
+                        .forEach(mockup => {
+                          handleSingleImageUpload(mockup.id, file, DesignColor.White);
+                        });
+                    }}
+                    className="w-full cursor-pointer rounded-lg border-2 border-stroke bg-transparent outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:font-medium file:text-white hover:file:cursor-pointer hover:file:bg-opacity-90"
+                  />
+                </div>
+
+                {/* Color Design Upload */}
+                <div className="mb-4.5">
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Upload Color Design (Applies to all mockups)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      mocksToShow.forEach(mockup => {
+                        handleSingleImageUpload(mockup.id, file, DesignColor.Color);
+                      });
+                    }}
+                    className="w-full cursor-pointer rounded-lg border-2 border-stroke bg-transparent outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:font-medium file:text-white hover:file:cursor-pointer hover:file:bg-opacity-90"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Mockup Selection */}
           <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
             <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
@@ -884,72 +813,15 @@ const GeneratePage = () => {
 
           {mocksToShow.length > 0 && (
             <>
-              {/* Bulk Upload Section */}
-              <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-                <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark">
-                  <h3 className="font-medium text-black dark:text-white">
-                    Bulk Upload Designs
-                  </h3>
-                </div>
-                <div className="p-6.5">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Black Design Bulk Upload */}
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                        Black Design
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleBulkUpload(e.target.files?.[0] || null, DesignColor.Black)}
-                          className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
-                        />
-                      </div>
-                    </div>
-
-                    {/* White Design Bulk Upload */}
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                        White Design
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleBulkUpload(e.target.files?.[0] || null, DesignColor.White)}
-                          className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Color Design Bulk Upload */}
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-black dark:text-white">
-                        Color Design
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleBulkUpload(e.target.files?.[0] || null, DesignColor.Color)}
-                          className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Mockup Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {mocksToShow.map((mockup) => (
                   <MockupCard
                     key={mockup.id}
                     mockup={mockup}
-                    singleImageUpload={singleImageUploads.find(u => u.mockupId === mockup.id)}
+                    singleImageUpload={getSingleImageUploads().find(u => u.mockupId === mockup.id)}
                     onSingleImageUpload={handleSingleImageUpload}
-                    designFiles={designFiles}
+                    designFiles={getDesignFiles()}
                     onDesignFileChange={handleFileChange}
                   />
                 ))}
@@ -957,8 +829,11 @@ const GeneratePage = () => {
 
               {/* Generate Button */}
               <button
-                onClick={handleGenerate}
-                disabled={isGenerating || !singleImageUploads.some(u => u.file)}
+                onClick={() => {
+                  console.log('Generate button clicked');
+                  handleGenerate();
+                }}
+                disabled={isGenerating}
                 className="mt-6 flex w-full justify-center rounded-lg bg-primary p-4 font-medium text-gray hover:bg-opacity-90 disabled:opacity-50"
               >
                 {isGenerating ? (

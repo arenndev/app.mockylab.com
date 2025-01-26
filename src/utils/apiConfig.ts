@@ -76,6 +76,7 @@ export const endpoints = {
     create: '/Mockup',
     update: (id: number) => `/Mockup/${id}`,
     delete: (id: number) => `/Mockup/${id}`,
+    generate: '/Mockup/generate',
     designAreas: {
       list: (mockupId: number) => `/mockups/${mockupId}/design-areas`,
       create: (mockupId: number) => `/mockups/${mockupId}/design-areas`,
@@ -103,10 +104,10 @@ export const endpoints = {
 // Helper function to get user ID from token
 export const getCurrentUserId = (): string => {
   const user = authService.getCurrentUser();
-  if (!user?.nameIdentifier) {
+  if (!user?.userId) {
     throw new Error('User ID not found');
   }
-  return user.nameIdentifier;
+  return user.userId;
 };
 
 // Error handler helper

@@ -8,10 +8,15 @@ interface LoginResponse {
 }
 
 interface DecodedToken {
-  nameIdentifier: string;
-  name: string;
-  email: string;
+  sub: string;
+  jti: string;
+  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name": string;
+  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier": string;
+  "http://schemas.microsoft.com/ws/2008/06/identity/claims/role": string;
   exp: number;
+  iss: string;
+  aud: string;
+  userId?: string;
   [key: string]: any;
 }
 
@@ -29,6 +34,9 @@ class AuthService {
 
       if (response.data.token) {
         const decodedToken = jwtDecode<DecodedToken>(response.data.token);
+        
+        // Add userId from nameidentifier claim
+        decodedToken.userId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
         
         // Store in both localStorage and cookies
         localStorage.setItem(this.tokenKey, response.data.token);
@@ -102,11 +110,15 @@ class AuthService {
   }
 
   getCurrentUser(): DecodedToken | null {
-    const userStr = localStorage.getItem(this.userKey);
-    if (!userStr) return null;
-    
     try {
-      return JSON.parse(userStr);
+      const token = this.getToken();
+      if (!token) return null;
+      
+      const decodedToken = jwtDecode<DecodedToken>(token);
+      // Add userId from nameidentifier claim
+      decodedToken.userId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+      
+      return decodedToken;
     } catch {
       return null;
     }
@@ -123,6 +135,8 @@ class AuthService {
 
       if (response.data.token) {
         const decodedToken = jwtDecode<DecodedToken>(response.data.token);
+        // Add userId from nameidentifier claim
+        decodedToken.userId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
         
         // Update both localStorage and cookies
         localStorage.setItem(this.tokenKey, response.data.token);

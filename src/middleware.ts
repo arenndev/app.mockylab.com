@@ -4,10 +4,21 @@ import type { NextRequest } from 'next/server';
 // Public paths that don't require authentication
 const publicPaths = ['/login', '/', '/auth/signup'];
 
+// Protected paths that should not redirect to /mockup/list
+const allowedProtectedPaths = [
+  '/mockup/list',
+  '/mockup/favorite',
+  '/mockup/generate',
+  '/mockup/add',
+  '/mockup/edit',
+  '/printify'
+];
+
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const path = request.nextUrl.pathname;
   const isPublicPath = publicPaths.includes(path);
+  const isAllowedProtectedPath = allowedProtectedPaths.some(allowedPath => path.startsWith(allowedPath));
 
   // If no token and trying to access protected route
   if (!token && !isPublicPath) {

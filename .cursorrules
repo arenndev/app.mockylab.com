@@ -29,7 +29,8 @@
         "mockups": {
           "base": "/Mockup",
           "design_areas": "/mockups/{mockupId}/design-areas",
-          "user": "/UserOfMockup"
+          "user": "/UserOfMockup",
+          "generate": "/Mockup/generate"
         }
       }
     }
@@ -63,12 +64,22 @@
       ]
     },
     "mockup": {
-      "creation_flow": [
-        "Select blueprint",
-        "Configure design areas",
-        "Upload designs",
-        "Generate mockup"
+      "generation_flow": [
+        "Select mockups (from quick select or favorites)",
+        "Upload designs per mockup or use bulk upload",
+        "Generate and download mockups"
       ],
+      "design_upload_options": {
+        "individual": {
+          "single_design": "One design for all areas",
+          "multiple_designs": "Different design per area (for mockups with multiple areas)"
+        },
+        "bulk": {
+          "black_designs": "Upload for all black design mockups",
+          "white_designs": "Upload for all white design mockups",
+          "color_designs": "Upload for all color design mockups"
+        }
+      },
       "design_area_calculation": {
         "position": {
           "centerX": "(group.left - imageLeft) / imageScale",
@@ -86,26 +97,10 @@
         "designColor",
         "designAreas"
       ],
-      "edit_flow": {
-        "area_operations": {
-          "add": "Create new design area with name and default size",
-          "save": "Update area dimensions and position",
-          "delete": "Remove area from mockup"
-        },
-        "form_operations": {
-          "update": "Modify mockup details and image",
-          "validation": "Check for unsaved area changes before form submission"
-        },
-        "notifications": {
-          "area_changes": {
-            "success": "Show success message without page refresh",
-            "error": "Display error with retry option"
-          },
-          "form_changes": {
-            "success": "Show success message with auto-refresh",
-            "error": "Display error with retry option"
-          }
-        }
+      "design_color_types": {
+        "Black": 0,
+        "White": 1,
+        "Color": 2
       }
     }
   },

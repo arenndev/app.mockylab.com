@@ -27,7 +27,8 @@
     "next-auth": "^4.24.11",
     "react": "^18",
     "react-apexcharts": "^1.7.0",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "react-toastify": "^11.0.3"
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",
