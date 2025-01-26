@@ -8,7 +8,11 @@
     "routing": {
       "base": "/src/app",
       "protected_routes": ["/mockup/*", "/printify/*", "/profile/*", "/settings/*"],
-      "public_routes": ["/login", "/"]
+      "public_routes": ["/login", "/"],
+      "auth_redirect": {
+        "default": "/mockup/list",
+        "unauthorized": "/login"
+      }
     },
     "api": {
       "base_url": "process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'",
@@ -24,6 +28,7 @@
         },
         "mockups": {
           "base": "/Mockup",
+          "design_areas": "/mockups/{mockupId}/design-areas",
           "user": "/UserOfMockup"
         }
       }
@@ -31,10 +36,22 @@
   },
   "features": {
     "auth": {
-      "token_storage": "localStorage",
+      "token_storage": ["localStorage", "cookies"],
       "token_key": "token",
       "refresh_token_key": "refreshToken",
-      "user_key": "user"
+      "user_key": "user",
+      "cookie_options": {
+        "token": {
+          "expires": "1 day",
+          "secure": true,
+          "sameSite": "strict"
+        },
+        "refreshToken": {
+          "expires": "7 days",
+          "secure": true,
+          "sameSite": "strict"
+        }
+      }
     },
     "printify": {
       "required_settings": ["apiKey", "shopId"],
@@ -52,6 +69,17 @@
         "Upload designs",
         "Generate mockup"
       ],
+      "design_area_calculation": {
+        "position": {
+          "centerX": "(group.left - imageLeft) / imageScale",
+          "centerY": "(group.top - imageTop) / imageScale"
+        },
+        "dimensions": {
+          "width": "rect.getScaledWidth() / imageScale",
+          "height": "rect.getScaledHeight() / imageScale"
+        },
+        "angle": "group.angle"
+      },
       "required_fields": [
         "name",
         "category",
@@ -72,6 +100,13 @@
     "api": {
       "client": "apiClient from @/utils/apiConfig",
       "error_handling": "handleApiError from @/utils/apiConfig"
+    },
+    "auth": {
+      "token_management": {
+        "storage": "Dual storage in localStorage and cookies for better security",
+        "refresh": "Automatic token refresh on expiration",
+        "cleanup": "Complete cleanup on logout (localStorage, cookies, headers)"
+      }
     }
   },
   "workflow": {
@@ -82,6 +117,13 @@
       "Implement UI components",
       "Add error handling",
       "Test functionality"
+    ],
+    "auth_flow": [
+      "Login with username/password",
+      "Store tokens in both localStorage and cookies",
+      "Automatic token refresh",
+      "Protected route redirection",
+      "Clean logout with full cleanup"
     ]
   }
 } 

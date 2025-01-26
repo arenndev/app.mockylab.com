@@ -4,11 +4,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import Layout from '@/components/Layouts/DefaultLayout';
 import Image from 'next/image';
-import axios from 'axios';
-import Loader from '@/components/common/Loader';
 import { useRouter } from 'next/navigation';
+import { apiClient, handleApiError } from '@/utils/apiConfig';
+import Loader from '@/components/common/Loader';
 import { authService } from '@/services/authService';
-import { API_URL } from '@/utils/apiConfig';
 
 // Enum tanımlamaları
 enum TshirtCategory {
@@ -98,22 +97,41 @@ interface DesignRect extends fabric.Rect {
   designAreaName?: string;
 }
 
+interface FormData {
+  name: string;
+  category: string;
+  tshirtCategory: TshirtCategory;
+  sizeCategory: SizeCategory;
+  genderCategory: GenderCategory;
+  designColor: DesignColor;
+  imageFile: File | null;
+}
+
+interface DesignArea {
+  name: string;
+  width: number;
+  height: number;
+  angle: number;
+  centerX: number;
+  centerY: number;
+}
+
 const AddMockupPage = () => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [canvas, setCanvas] = React.useState<fabric.Canvas | null>(null);
-  const [rectangle, setRectangle] = React.useState<fabric.Group | null>(null);
-
-  const [formData, setFormData] = React.useState({
+  const [formData, setFormData] = React.useState<FormData>({
     name: '',
     category: '',
     tshirtCategory: TshirtCategory.TSHIRT,
     sizeCategory: SizeCategory.ADULT,
     genderCategory: GenderCategory.UNISEX,
     designColor: DesignColor.BLACK,
-    imageFile: null as File | null
+    imageFile: null
   });
 
-  const [alertState, setAlertState] = React.useState<{
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [alertState, setAlertState] = useState<{
     show: boolean;
     message: string;
     type: 'error' | 'success' | 'warning';
@@ -123,112 +141,110 @@ const AddMockupPage = () => {
     type: 'error'
   });
 
-  const [originalImageSize, setOriginalImageSize] = React.useState<{width: number, height: number} | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
   const router = useRouter();
 
-  // Canvas initialization
+  // Initialize canvas
   useEffect(() => {
-    if (canvasRef.current) {
-      if (canvas) {
-        canvas.dispose();
-      }
+    if (!canvasRef.current) return;
 
-      const newCanvas = new fabric.Canvas(canvasRef.current, {
-        width: 500,
-        height: 500,
-        backgroundColor: '#ffffff'
-      });
-      setCanvas(newCanvas);
+    const newCanvas = new fabric.Canvas(canvasRef.current, {
+      width: 500,
+      height: 500,
+      backgroundColor: '#ffffff',
+      preserveObjectStacking: true
+    });
 
-      // Default rectangle oluştur
-      const rect = new fabric.Rect({
-        left: 0,
-        top: 0,
-        width: 100,
-        height: 100,
-        fill: 'black',
-        strokeWidth: 0,
-        originX: 'center',
-        originY: 'center'
-      }) as DesignRect;
+    setCanvas(newCanvas);
 
-      rect.designAreaName = 'Default Area';
-
-      const text = new fabric.Text('Default Area', {
-        fontSize: 14,
-        fill: 'white',
-        originX: 'center',
-        originY: 'center'
-      });
-
-      const group = new fabric.Group([rect, text], {
-        left: 200,
-        top: 200,
-        width: rect.width,
-        height: rect.height,
-        originX: 'center',
-        originY: 'center'
-      });
-
-      newCanvas.add(group);
-      setRectangle(group);
-
-      return () => {
-        newCanvas.dispose();
-      };
-    }
+    // Cleanup
+    return () => {
+      newCanvas.dispose();
+    };
   }, []);
 
-  // Design area oluşturma fonksiyonu
-  const createNewDesignArea = (areaName: string) => {
-    if (canvas) {
-      const rect = new fabric.Rect({
-        width: 100,
-        height: 100,
-        fill: 'black',
-        strokeWidth: 0,
-        originX: 'center',
-        originY: 'center'
-      }) as DesignRect;
+  // Add default design area
+  useEffect(() => {
+    if (!canvas) return;
 
-      const text = new fabric.Text(areaName, {
-        fontSize: 14,
-        fill: 'white',
-        originX: 'center',
-        originY: 'center'
-      });
+    createNewDesignArea('Default Area', canvas);
+  }, [canvas]);
 
-      const group = new fabric.Group([rect, text], {
-        left: canvas.width! / 2,
-        top: canvas.height! / 2,
-        originX: 'center',
-        originY: 'center',
-        centeredRotation: true
-      });
+  const validateForm = (): boolean => {
+    const newErrors: Partial<Record<keyof FormData, string>> = {};
 
-      rect.designAreaName = areaName;
-      canvas.add(group);
-      canvas.renderAll();
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
     }
+
+    if (!formData.category.trim()) {
+      newErrors.category = 'Category is required';
+    }
+
+    if (!formData.imageFile) {
+      newErrors.imageFile = 'Background image is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const createNewDesignArea = (areaName: string, targetCanvas: fabric.Canvas) => {
+    const rect = new fabric.Rect({
+      width: 100,
+      height: 100,
+      fill: 'rgba(0,0,0,0.5)',
+      strokeWidth: 2,
+      stroke: '#000',
+      originX: 'center',
+      originY: 'center'
+    }) as DesignRect;
+
+    rect.designAreaName = areaName;
+
+    const text = new fabric.Text(areaName, {
+      fontSize: 14,
+      fill: 'white',
+      originX: 'center',
+      originY: 'center',
+      selectable: false
+    });
+
+    const group = new fabric.Group([rect, text], {
+      left: targetCanvas.width! / 2,
+      top: targetCanvas.height! / 2,
+      originX: 'center',
+      originY: 'center',
+      centeredRotation: true,
+      hasControls: true,
+      hasBorders: true
+    });
+
+    targetCanvas.add(group);
+    targetCanvas.setActiveObject(group);
+    targetCanvas.renderAll();
+
+    // Add event listeners
+    group.on('moving', () => targetCanvas.renderAll());
+    group.on('scaling', () => targetCanvas.renderAll());
+    group.on('rotating', () => targetCanvas.renderAll());
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error when user starts typing
+    if (errors[name as keyof FormData]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && canvas) {
-      setFormData(prev => ({
-        ...prev,
-        imageFile: file
-      }));
+    if (!file || !canvas) return;
+
+    try {
+      setFormData(prev => ({ ...prev, imageFile: file }));
 
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -236,12 +252,9 @@ const AddMockupPage = () => {
           const img = new window.Image();
           img.src = event.target.result as string;
           img.onload = () => {
-            setOriginalImageSize({
-              width: img.width,
-              height: img.height
-            });
-
             const fabricImage = new fabric.Image(img);
+            
+            // Scale image to fit canvas
             const scale = Math.min(
               canvas.width! / fabricImage.width!,
               canvas.height! / fabricImage.height!
@@ -254,17 +267,17 @@ const AddMockupPage = () => {
               selectable: false,
               evented: false
             });
-            
-            // Tüm mevcut grupları sakla
+
+            // Store all existing groups
             const groups = canvas.getObjects().filter(obj => obj instanceof fabric.Group);
             
-            // Canvas'ı temizle
+            // Clear canvas
             canvas.clear();
             
-            // Önce resmi ekle
+            // Add image first (at the back)
             canvas.add(fabricImage);
             
-            // Sonra tüm grupları tekrar ekle
+            // Re-add all groups (on top)
             groups.forEach(group => {
               canvas.add(group);
             });
@@ -273,181 +286,132 @@ const AddMockupPage = () => {
           };
         }
       };
+
       reader.readAsDataURL(file);
+    } catch (error) {
+      setAlertState({
+        show: true,
+        message: error instanceof Error ? error.message : 'Failed to load image',
+        type: 'error'
+      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      setIsLoading(true);
+    if (!canvas || !formData.imageFile) return;
 
-      // Token kontrolü
+    setIsLoading(true);
+    try {
+      // Form validation
+      if (!validateForm()) {
+        return;
+      }
+
+      // Get background image
+      const backgroundImage = canvas.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
+      if (!backgroundImage) {
+        throw new Error('Background image not found');
+      }
+
+      // Calculate image scale
+      const imageScale = backgroundImage.scaleX || 1;
+      const imageLeft = backgroundImage.left || 0;
+      const imageTop = backgroundImage.top || 0;
+
+      // Get design areas from canvas
+      const designAreas = canvas.getObjects()
+        .filter((obj): obj is fabric.Group => obj instanceof fabric.Group)
+        .map(group => {
+          const rect = group.getObjects().find((obj): obj is DesignRect => 
+            obj instanceof fabric.Rect
+          ) as DesignRect;
+          
+          // Calculate relative position to image
+          const relativeX = (group.left || 0) - imageLeft;
+          const relativeY = (group.top || 0) - imageTop;
+
+          // Convert to original image coordinates
+          const originalX = Math.round(relativeX / imageScale);
+          const originalY = Math.round(relativeY / imageScale);
+          
+          // Get dimensions directly from the rect
+          const originalWidth = Math.round(rect.getScaledWidth() / imageScale);
+          const originalHeight = Math.round(rect.getScaledHeight() / imageScale);
+
+          // Log dimensions for debugging
+          console.log('Design Area Dimensions:', {
+            rectOriginalWidth: rect.width,
+            rectOriginalHeight: rect.height,
+            rectScaledWidth: rect.getScaledWidth(),
+            rectScaledHeight: rect.getScaledHeight(),
+            groupScaleX: group.scaleX,
+            groupScaleY: group.scaleY,
+            imageScale,
+            calculatedWidth: originalWidth,
+            calculatedHeight: originalHeight
+          });
+
+          return {
+            name: rect.designAreaName || 'Unnamed Area',
+            width: originalWidth,
+            height: originalHeight,
+            angle: Math.round(group.angle || 0),
+            centerX: originalX,
+            centerY: originalY
+          };
+        });
+
+      // Get token and check authentication
       const token = authService.getToken();
       if (!token) {
-        router.push('/auth/signin');
+        router.push('/login');
         return;
       }
 
-      // User bilgisini al
-      const currentUser = authService.getCurrentUser();
-      console.log('Current user:', currentUser);
-      
-      if (!currentUser || !currentUser.userId) {
-        router.push('/auth/signin');
-        return;
-      }
-
-      if (!formData.imageFile) {
-        throw new Error('Please select an image file');
-      }
-
-      if (!formData.name || !formData.category) {
-        setAlertState({
-          show: true,
-          message: 'Please fill in all required fields',
-          type: 'error'
-        });
-        return;
-      }
-
-      setAlertState({
-        show: true,
-        message: 'Creating mockup...',
-        type: 'warning'
-      });
-
+      // Create form data
       const formDataToSend = new FormData();
       formDataToSend.append('Name', formData.name);
       formDataToSend.append('Category', formData.category);
-      formDataToSend.append('GenderCategory', formData.genderCategory);
-      formDataToSend.append('DesignColor', formData.designColor);
       formDataToSend.append('TshirtCategory', formData.tshirtCategory);
       formDataToSend.append('SizeCategory', formData.sizeCategory);
+      formDataToSend.append('GenderCategory', formData.genderCategory);
+      formDataToSend.append('DesignColor', formData.designColor);
       formDataToSend.append('ImageFile', formData.imageFile);
-      formDataToSend.append('UserId', currentUser.userId);
 
-      const response = await fetch(`${API_URL}/api/Mockup`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formDataToSend,
-      });
+      // First create the mockup
+      const mockupResponse = await apiClient.post('/Mockup', formDataToSend);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          throw new Error(`Failed to create mockup: ${errorText}`);
-        }
-        throw new Error(errorData.message || 'Failed to create mockup');
-      }
+      if (mockupResponse.data.success) {
+        // Get the created mockup ID
+        const mockupId = mockupResponse.data.data.id;
 
-      const result = await response.json();
-      
-      if (result.success && result.data?.id) {
-        setAlertState({
-          show: true,
-          message: 'Creating design areas...',
-          type: 'warning'
-        });
-
-        const groups = canvas?.getObjects().filter(obj => obj instanceof fabric.Group);
-        
-        if (groups && groups.length > 0) {
-          const canvasImage = canvas?.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
-          
-          if (!originalImageSize) {
-            throw new Error('Original image size not available');
-          }
-
-          const imageScaleX = originalImageSize.width / (canvasImage?.width! * canvasImage?.scaleX!);
-          const imageScaleY = originalImageSize.height / (canvasImage?.height! * canvasImage?.scaleY!);
-
-          for (const group of groups) {
-            const groupBoundingRect = group.getBoundingRect();
-            
-            const groupCenter = group.getCenterPoint();
-
-            const relativeCenterX = groupCenter.x - canvasImage?.left!;
-            const relativeCenterY = groupCenter.y - canvasImage?.top!;
-
-            const scaledWidth = Math.round(groupBoundingRect.width * imageScaleX);
-            const scaledHeight = Math.round(groupBoundingRect.height * imageScaleY);
-            const scaledCenterX = Math.round(relativeCenterX * imageScaleX);
-            const scaledCenterY = Math.round(relativeCenterY * imageScaleY);
-
-            const rect = group.getObjects().find(obj => obj instanceof fabric.Rect) as DesignRect;
-            
-            const designArea = {
-              name: rect.designAreaName || 'Design Area',
-              left: Math.max(0, scaledCenterX - (scaledWidth / 2)),
-              top: Math.max(0, scaledCenterY - (scaledHeight / 2)),
-              centerX: scaledCenterX,
-              centerY: scaledCenterY,
-              width: scaledWidth,
-              height: scaledHeight,
-              angle: group.angle || 0
-            };
-
-            const areaResponse = await fetch(`${API_URL}/api/mockups/${result.data.id}/design-areas`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify(designArea)
-            });
-
-            if (!areaResponse.ok) {
-              const errorText = await areaResponse.text();
-              throw new Error(`Failed to create design area: ${errorText}`);
-            }
-
-            const areaResult = await areaResponse.json();
-            if (!areaResult.success) {
-              throw new Error(areaResult.message || 'Failed to create design area');
-            }
-          }
+        // Add design areas
+        for (const designArea of designAreas) {
+          await apiClient.post(`/mockups/${mockupId}/design-areas`, designArea);
         }
 
         setAlertState({
           show: true,
-          message: 'Mockup and design areas created successfully! Redirecting...',
+          message: 'Mockup and design areas created successfully',
           type: 'success'
         });
-
+        
+        // Redirect after success
         setTimeout(() => {
-          router.push(`/mockup/edit?mockupId=${result.data.id}`);
-        }, 1500);
-
-        setFormData({
-          name: '',
-          category: '',
-          tshirtCategory: TshirtCategory.TSHIRT,
-          sizeCategory: SizeCategory.ADULT,
-          genderCategory: GenderCategory.UNISEX,
-          designColor: DesignColor.BLACK,
-          imageFile: null
-        });
-
-        if (canvas) {
-          canvas.clear();
-          canvas.renderAll();
-          
-          createNewDesignArea('Default Area');
-        }
+          router.push('/mockup/list');
+        }, 2000);
       }
-
-    } catch (error) {
-      console.error('Error creating mockup:', error);
+    } catch (error: any) {
+      console.error('Error details:', error);
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+      }
       setAlertState({
         show: true,
-        message: error instanceof Error ? error.message : 'Failed to create mockup',
+        message: handleApiError(error),
         type: 'error'
       });
     } finally {
@@ -507,8 +471,8 @@ const AddMockupPage = () => {
                     onClick={() => {
                       const nameInput = document.getElementById('designAreaName') as HTMLInputElement;
                       const areaName = nameInput.value.trim();
-                      if (areaName) {
-                        createNewDesignArea(areaName);
+                      if (areaName && canvas) {
+                        createNewDesignArea(areaName, canvas);
                         nameInput.value = '';
                       }
                     }}
