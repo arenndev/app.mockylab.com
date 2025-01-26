@@ -116,6 +116,109 @@ interface DesignArea {
   centerY: number;
 }
 
+// Result Modal Component
+const ResultModal = ({ 
+  isOpen, 
+  message, 
+  type,
+  mockupId,
+  onClose 
+}: { 
+  isOpen: boolean; 
+  message: string; 
+  type: 'success' | 'error';
+  mockupId?: string;
+  onClose: () => void;
+}) => {
+  const router = useRouter();
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isOpen && type === 'success') {
+      timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setTimeout(() => {
+              router.push(`/mockup/edit?mockupId=${mockupId}`);
+            }, 0);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isOpen, type, mockupId, router]);
+
+  if (!isOpen) return null;
+
+  const handleRedirect = (path: string) => {
+    setTimeout(() => {
+      router.push(path);
+    }, 0);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-boxdark">
+        <div className="mb-6 text-center">
+          {type === 'success' ? (
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#34D399] bg-opacity-[15%]">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M30.5968 1.65364L30.5736 1.62365L30.5482 1.5955C29.8346 0.803734 28.6476 0.801508 27.9314 1.58881L11.8378 18.9075L4.11334 10.5736C3.39712 9.78574 2.20974 9.78778 1.49599 10.5797C0.834671 11.3135 0.834671 12.4467 1.49599 13.1805L1.49592 13.1806L1.5054 13.1908L9.73484 22.0696C10.2889 22.681 11.0572 23 11.7916 23C12.5848 23 13.3036 22.671 13.848 22.07L30.4324 4.22322C31.1666 3.48904 31.152 2.37231 30.5968 1.65364Z" fill="#34D399"/>
+              </svg>
+            </div>
+          ) : (
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#F87171] bg-opacity-[15%]">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 2C8.2 2 2 8.2 2 16C2 23.8 8.2 30 16 30C23.8 30 30 23.8 30 16C30 8.2 23.8 2 16 2ZM21.4 23L16 17.6L10.6 23L9 21.4L14.4 16L9 10.6L10.6 9L16 14.4L21.4 9L23 10.6L17.6 16L23 21.4L21.4 23Z" fill="#F87171"/>
+              </svg>
+            </div>
+          )}
+          <h3 className="mb-2 text-xl font-bold text-black dark:text-white">
+            {type === 'success' ? 'Success!' : 'Error!'}
+          </h3>
+          <p className="text-body-color dark:text-body-color-dark mb-6">
+            {message}
+          </p>
+          {type === 'success' && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Redirecting in {countdown} seconds...
+            </p>
+          )}
+        </div>
+        <div className="flex justify-center gap-4">
+          {type === 'success' ? (
+            <>
+              <button
+                onClick={() => handleRedirect('/mockup/list')}
+                className="rounded bg-primary bg-opacity-90 px-6 py-2 text-white transition hover:bg-opacity-100"
+              >
+                Go to List
+              </button>
+              <button
+                onClick={() => handleRedirect(`/mockup/edit?mockupId=${mockupId}`)}
+                className="rounded bg-primary px-6 py-2 text-white transition hover:bg-opacity-90"
+              >
+                Edit Mockup
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onClose}
+              className="rounded bg-primary px-6 py-2 text-white transition hover:bg-opacity-90"
+            >
+              Try Again
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AddMockupPage = () => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [canvas, setCanvas] = React.useState<fabric.Canvas | null>(null);
@@ -131,14 +234,16 @@ const AddMockupPage = () => {
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [alertState, setAlertState] = useState<{
-    show: boolean;
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
     message: string;
-    type: 'error' | 'success' | 'warning';
+    type: 'success' | 'error';
+    mockupId?: string;
   }>({
-    show: false,
+    isOpen: false,
     message: '',
-    type: 'error'
+    type: 'error',
+    
   });
 
   const router = useRouter();
@@ -193,8 +298,7 @@ const AddMockupPage = () => {
       width: 100,
       height: 100,
       fill: 'rgba(0,0,0,0.5)',
-      strokeWidth: 2,
-      stroke: '#000',
+      strokeWidth: 0,
       originX: 'center',
       originY: 'center'
     }) as DesignRect;
@@ -289,8 +393,8 @@ const AddMockupPage = () => {
 
       reader.readAsDataURL(file);
     } catch (error) {
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: error instanceof Error ? error.message : 'Failed to load image',
         type: 'error'
       });
@@ -305,6 +409,7 @@ const AddMockupPage = () => {
     try {
       // Form validation
       if (!validateForm()) {
+        setIsLoading(false);
         return;
       }
 
@@ -383,7 +488,6 @@ const AddMockupPage = () => {
       const mockupResponse = await apiClient.post('/Mockup', formDataToSend);
 
       if (mockupResponse.data.success) {
-        // Get the created mockup ID
         const mockupId = mockupResponse.data.data.id;
 
         // Add design areas
@@ -391,16 +495,12 @@ const AddMockupPage = () => {
           await apiClient.post(`/mockups/${mockupId}/design-areas`, designArea);
         }
 
-        setAlertState({
-          show: true,
+        setModalState({
+          isOpen: true,
           message: 'Mockup and design areas created successfully',
-          type: 'success'
+          type: 'success',
+          mockupId: mockupId
         });
-        
-        // Redirect after success
-        setTimeout(() => {
-          router.push('/mockup/list');
-        }, 2000);
       }
     } catch (error: any) {
       console.error('Error details:', error);
@@ -409,8 +509,8 @@ const AddMockupPage = () => {
         console.error('Response status:', error.response.status);
         console.error('Response headers:', error.response.headers);
       }
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: handleApiError(error),
         type: 'error'
       });
@@ -421,8 +521,20 @@ const AddMockupPage = () => {
 
   return (
     <Layout>
-      {isLoading && <Loader />}
+      {isLoading && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
+          <Loader />
+        </div>
+      )}
       
+      <ResultModal
+        isOpen={modalState.isOpen}
+        message={modalState.message}
+        type={modalState.type}
+        mockupId={modalState.mockupId}
+        onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+      />
+
       <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-black dark:text-white">
@@ -440,13 +552,6 @@ const AddMockupPage = () => {
             </ol>
           </nav>
         </div>
-
-        {alertState.show && (
-          <Alert 
-            message={alertState.message} 
-            type={alertState.type} 
-          />
-        )}
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Canvas Bölümü */}
