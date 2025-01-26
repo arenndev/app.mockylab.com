@@ -155,6 +155,41 @@
           }
         }
       }
+    },
+    "theme": {
+      "mode_settings": {
+        "light": {
+          "background": "bg-white",
+          "text": "text-black",
+          "description": "Default light mode with white background and dark text"
+        },
+        "dark": {
+          "background": "dark:bg-boxdark",
+          "text": "dark:text-white",
+          "description": "Dark mode with boxdark background and white text"
+        }
+      },
+      "implementation": {
+        "global_styles": {
+          "location": "/src/app/globals.css",
+          "body_class": "@apply bg-white dark:bg-boxdark text-black dark:text-white"
+        },
+        "tailwind_config": {
+          "location": "tailwind.config.ts",
+          "darkMode": "class",
+          "colors": {
+            "boxdark": "#24303F",
+            "white": "#FFFFFF",
+            "black": "#1C2434"
+          }
+        }
+      },
+      "best_practices": [
+        "Use Tailwind dark mode classes for theme consistency",
+        "Apply theme colors through globals.css for base styles",
+        "Avoid direct color codes in components",
+        "Use semantic color names from Tailwind config"
+      ]
     }
   },
   "conventions": {
