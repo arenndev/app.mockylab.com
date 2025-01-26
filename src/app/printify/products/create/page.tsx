@@ -60,14 +60,11 @@ const CreateProduct = () => {
     // Blueprint seçimi
     const handleBlueprintSelect = async (blueprint: PrintifyBlueprint) => {
         try {
-            // Blueprint detaylarını al
             const blueprintDetails = await printifyService.getBlueprintDetails(blueprint.id);
-            
-            // Variant'ları al
             const variants = await printifyService.getBlueprintVariants(blueprint.id, {
                 printProviderId: 99,
                 page: 1,
-                pageSize: 100
+                pageSize: 1000
             });
 
             const updatedBlueprint: Blueprint = {

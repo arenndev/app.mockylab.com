@@ -35,7 +35,9 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
                 throw new Error('User not found');
             }
             const response = await printifyService.getUserBlueprints(userId);
-            setBlueprints(response);
+            // Her bir userBlueprint'in blueprint özelliğini al
+            const blueprintsList = response.map(item => item.blueprint);
+            setBlueprints(blueprintsList);
         } catch (error) {
             console.error('Error fetching user blueprints:', error);
             setError(error instanceof Error ? error.message : 'Failed to fetch blueprints');

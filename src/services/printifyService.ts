@@ -6,7 +6,8 @@ import {
   BlueprintListResponse,
   VariantResponse,
   CreateProductRequest,
-  PrintifyApiResponse
+  PrintifyApiResponse,
+  BlueprintVariant
 } from '@/types/printify';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
@@ -32,7 +33,25 @@ const ENDPOINTS = {
   user: {
     blueprints: (userId: string) => `/api/UserOfBlueprint/user/${userId}`,
     removeBlueprint: (id: number) => `/api/UserOfBlueprint/${id}`,
+    variants: {
+      get: (id: number) => `/api/UserOfVariant/${id}`,
+      getByUser: (userId: string) => `/api/UserOfVariant/user/${userId}`,
+      getByBlueprint: (userId: string, blueprintId: number) => `/api/UserOfVariant/user/${userId}/blueprint/${blueprintId}`,
+      create: '/api/UserOfVariant',
+      createBulk: '/api/UserOfVariant/bulk',
+      update: (id: number) => `/api/UserOfVariant/${id}`,
+      delete: (id: number) => `/api/UserOfVariant/${id}`,
+    },
   },
+  userVariants: {
+    get: (id: number) => `/api/UserOfVariant/${id}`,
+    getByUser: (userId: string) => `/api/UserOfVariant/user/${userId}`,
+    getByBlueprint: (userId: string, blueprintId: number) => `/api/UserOfVariant/user/${userId}/blueprint/${blueprintId}`,
+    create: '/api/UserOfVariant',
+    createBulk: '/api/UserOfVariant/bulk',
+    update: (id: number) => `/api/UserOfVariant/${id}`,
+    delete: (id: number) => `/api/UserOfVariant/${id}`
+  }
 };
 
 class PrintifyService {
@@ -147,7 +166,11 @@ class PrintifyService {
       const response = await axios.get<VariantResponse>(
         `${API_URL}${ENDPOINTS.blueprints.variants(blueprintId)}`,
         {
-          params,
+          params: {
+            printProviderId: params.printProviderId,
+            page: 1,
+            pageSize: 1000 // Increased page size to get more variants at once
+          },
           headers: this.getHeaders(),
         }
       );
@@ -267,6 +290,97 @@ class PrintifyService {
     try {
       await axios.delete(
         `${API_URL}${ENDPOINTS.user.removeBlueprint(id)}`,
+        { headers: this.getHeaders() }
+      );
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // User Variants
+  async getUserVariants(userId: string) {
+    try {
+      const response = await axios.get(
+        `${API_URL}${ENDPOINTS.user.variants.getByUser(userId)}`,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getUserVariantsByBlueprint(userId: string, blueprintId: number) {
+    try {
+      const response = await axios.get(
+        `${API_URL}${ENDPOINTS.userVariants.getByBlueprint(userId, blueprintId)}`,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async createUserVariant(data: {
+    userId: number;
+    blueprintId: number;
+    variantId: number;
+    defaultPrice: number;
+    isEnabled: boolean;
+  }) {
+    try {
+      const response = await axios.post(
+        `${API_URL}${ENDPOINTS.userVariants.create}`,
+        data,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async createUserVariantsBulk(data: {
+    userId: number;
+    blueprintId: number;
+    variantId: number;
+    defaultPrice: number;
+    isEnabled: boolean;
+  }[]) {
+    try {
+      const response = await axios.post(
+        `${API_URL}${ENDPOINTS.userVariants.createBulk}`,
+        data,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async updateUserVariant(id: number, data: {
+    defaultPrice: number;
+    isEnabled: boolean;
+    isActive: boolean;
+  }) {
+    try {
+      const response = await axios.put(
+        `${API_URL}${ENDPOINTS.userVariants.update(id)}`,
+        data,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async deleteUserVariant(id: number) {
+    try {
+      await axios.delete(
+        `${API_URL}${ENDPOINTS.userVariants.delete(id)}`,
         { headers: this.getHeaders() }
       );
     } catch (error) {
