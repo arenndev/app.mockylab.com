@@ -87,4 +87,28 @@ export interface UserOfVariant {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductImage {
+  src: string;
+  isDefault: boolean;
+}
+
+export interface Product {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  images: ProductImage[];
+  createdAt: string;
+  updatedAt: string;
+  visible: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  currentPage: number;
+  data: T[];
+  lastPage: number;
+  total: number;
+  perPage: number;
 } 

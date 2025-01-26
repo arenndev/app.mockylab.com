@@ -7,7 +7,9 @@ import {
   VariantResponse,
   CreateProductRequest,
   PrintifyApiResponse,
-  BlueprintVariant
+  BlueprintVariant,
+  PaginatedResponse,
+  Product
 } from '@/types/printify';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
@@ -26,6 +28,9 @@ const ENDPOINTS = {
   },
   products: {
     create: '/api/Printify/products',
+    list: (shopId: string) => `/api/Printify/shops/${shopId}/products`,
+    get: (shopId: string, productId: string) => `/api/Printify/shops/${shopId}/products/${productId}`,
+    updateTags: (shopId: string, productId: string) => `/api/Printify/shops/${shopId}/products/${productId}/tags`,
   },
   images: {
     upload: '/api/PrintifyImage/upload',
@@ -55,6 +60,8 @@ const ENDPOINTS = {
 };
 
 class PrintifyService {
+  private shopId: string | null = null;
+
   private getHeaders() {
     const token = authService.getToken();
     if (!token) {
@@ -64,6 +71,23 @@ class PrintifyService {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
+  }
+
+  async getShopId(): Promise<string> {
+    if (this.shopId) {
+      return this.shopId;
+    }
+
+    try {
+      const response = await axios.get<string>(
+        `${API_URL}/api/User/printify-shop-id`,
+        { headers: this.getHeaders() }
+      );
+      this.shopId = response.data;
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   private handleError(error: unknown) {
@@ -383,6 +407,67 @@ class PrintifyService {
         `${API_URL}${ENDPOINTS.userVariants.delete(id)}`,
         { headers: this.getHeaders() }
       );
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // Products list
+  async getProducts(shopId: string, page: number = 1, limit: number = 20) {
+    try {
+      const response = await axios.get(
+        `${API_URL}${ENDPOINTS.products.list(shopId)}`,
+        {
+          params: {
+            page,
+            limit,
+            useCache: false
+          },
+          headers: this.getHeaders()
+        }
+      );
+      
+      console.log('Products API Full Response:', response);
+      
+      // Ensure we're accessing the nested data structure correctly
+      const responseData = response.data;
+      const products = responseData.data?.data || [];
+      const paginationData = responseData.data;
+
+      return {
+        data: products,
+        currentPage: paginationData?.current_page || page,
+        lastPage: paginationData?.last_page || 1,
+        total: paginationData?.total || 0,
+        perPage: paginationData?.per_page || limit
+      };
+    } catch (error) {
+      console.error('Products API Error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Single product detail
+  async getProduct(shopId: string, productId: string) {
+    try {
+      const response = await axios.get(
+        `${API_URL}${ENDPOINTS.products.get(shopId, productId)}`,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  async updateProductTags(shopId: string, productId: string, tags: string[]) {
+    try {
+      const response = await axios.post(
+        `${API_URL}${ENDPOINTS.products.updateTags(shopId, productId)}`,
+        { tags },
+        { headers: this.getHeaders() }
+      );
+      return response.data;
     } catch (error) {
       throw this.handleError(error);
     }

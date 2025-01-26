@@ -146,6 +146,44 @@
             "update": "/api/UserOfVariant/{id}",
             "delete": "/api/UserOfVariant/{id}"
           }
+        },
+        "products": {
+          "list": {
+            "endpoint": "/api/Printify/shops/{shopId}/products",
+            "response": {
+              "data": {
+                "data": "Product[]",
+                "current_page": "number",
+                "last_page": "number",
+                "total": "number",
+                "per_page": "number"
+              },
+              "fromCache": "boolean"
+            }
+          },
+          "detail": {
+            "endpoint": "/api/Printify/shops/{shopId}/products/{productId}",
+            "response": {
+              "id": "string",
+              "title": "string",
+              "description": "string",
+              "tags": "string[]",
+              "images": {
+                "src": "string",
+                "isDefault": "boolean"
+              }[],
+              "variants": "ProductVariant[]",
+              "createdAt": "string",
+              "updatedAt": "string",
+              "visible": "boolean"
+            }
+          },
+          "updateTags": {
+            "endpoint": "/api/Printify/shops/{shopId}/products/{productId}/tags",
+            "request": {
+              "tags": "string[]"
+            }
+          }
         }
       }
     },

@@ -170,7 +170,7 @@ const menuGroups = [
         label: "Products",
         route: "#",
         children: [
-          
+          { label: 'Product List', route: '/printify/products' },
           { label: 'Create Product', route: '/printify/products/create' }
         ]
       }
