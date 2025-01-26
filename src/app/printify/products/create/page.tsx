@@ -8,10 +8,13 @@ import BlueprintSelectModal from '@/components/Modals/BlueprintSelectModal';
 import VariantSelectModal from '@/components/Modals/VariantSelectModal';
 import { authService } from '@/services/authService';
 import { printifyService } from '@/services/printifyService';
-import type { Blueprint as PrintifyBlueprint, BlueprintVariant } from '@/types/printify';
+import type { Blueprint as PrintifyBlueprint, BlueprintVariant, UserOfVariant } from '@/types/printify';
 
 interface Blueprint extends PrintifyBlueprint {
-    variants: BlueprintVariant[];
+    variants: (BlueprintVariant & {
+        price: number;
+        isEnabled: boolean;
+    })[];
 }
 
 interface CreateProductForm {
@@ -61,15 +64,22 @@ const CreateProduct = () => {
     const handleBlueprintSelect = async (blueprint: PrintifyBlueprint) => {
         try {
             const blueprintDetails = await printifyService.getBlueprintDetails(blueprint.id);
-            const variants = await printifyService.getBlueprintVariants(blueprint.id, {
-                printProviderId: 99,
-                page: 1,
-                pageSize: 1000
-            });
+            const userId = authService.getCurrentUser()?.nameIdentifier;
+            
+            if (!userId) {
+                throw new Error('User not authenticated');
+            }
+
+            const userVariants = await printifyService.getUserVariantsByBlueprint(userId, blueprint.id);
 
             const updatedBlueprint: Blueprint = {
                 ...blueprintDetails,
-                variants: variants.variants || []
+                variants: userVariants.map((uv: UserOfVariant) => ({
+                    ...uv,
+                    id: uv.variantId,
+                    price: uv.defaultPrice,
+                    isEnabled: uv.isEnabled
+                }))
             };
 
             setSelectedBlueprint(updatedBlueprint);

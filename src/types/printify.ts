@@ -75,4 +75,16 @@ export interface PrintifyApiResponse<T> {
   message?: string;
   data?: T;
   error?: string;
+}
+
+export interface UserOfVariant {
+  id: number;
+  userId: number;
+  blueprintId: number;
+  variantId: number;
+  defaultPrice: number;
+  isEnabled: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 } 

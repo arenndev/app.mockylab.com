@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { printifyService } from '@/services/printifyService';
 import { authService } from '@/services/authService';
+import type { BlueprintVariant, UserOfVariant } from '@/types/printify';
 
 interface VariantManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
   blueprintId: string;
-  variants: any[];
+  variants: BlueprintVariant[];
   onSave?: () => void;
 }
 
 const VariantManagementModal = ({ isOpen, onClose, blueprintId, variants, onSave }: VariantManagementModalProps) => {
-  const [userVariants, setUserVariants] = useState<any[]>([]);
+  const [userVariants, setUserVariants] = useState<UserOfVariant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,7 +43,7 @@ const VariantManagementModal = ({ isOpen, onClose, blueprintId, variants, onSave
     }
   };
 
-  const handleVariantToggle = async (variant: any) => {
+  const handleVariantToggle = async (variant: BlueprintVariant) => {
     try {
       const userId = authService.getUserId();
       if (!userId) {
@@ -79,7 +80,7 @@ const VariantManagementModal = ({ isOpen, onClose, blueprintId, variants, onSave
     }
   };
 
-  const handlePriceChange = async (variant: any, price: number) => {
+  const handlePriceChange = async (variant: UserOfVariant, price: number) => {
     try {
       await printifyService.updateUserVariant(variant.id, {
         defaultPrice: price,
@@ -125,9 +126,9 @@ const VariantManagementModal = ({ isOpen, onClose, blueprintId, variants, onSave
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 overflow-auto">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 overflow-auto">
       <div className="bg-white dark:bg-boxdark w-full max-w-4xl my-8 rounded-lg shadow-lg">
-        <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark sticky top-0 bg-white dark:bg-boxdark z-10">
+        <div className="border-b border-stroke px-6.5 py-4 dark:border-strokedark sticky top-0 bg-white dark:bg-boxdark z-[9999]">
           <div className="flex justify-between items-center">
             <h3 className="font-medium text-black dark:text-white">Variant Management</h3>
             <div className="flex items-center gap-4">

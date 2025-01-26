@@ -42,8 +42,6 @@ const BlueprintDetail = () => {
   };
 
   const fetchVariants = async () => {
-    if (!isVariantsOpen) return;
-    
     setIsLoading(true);
     setError(null);
     try {
@@ -119,16 +117,18 @@ const BlueprintDetail = () => {
     const initializeData = async () => {
       await fetchBlueprint();
       await fetchUserVariants();
+      await fetchVariants();
     };
     
     initializeData();
   }, [blueprintId]);
 
+  // Update variants when page changes
   useEffect(() => {
-    if (isVariantsOpen) {
+    if (variants) {
       fetchVariants();
     }
-  }, [isVariantsOpen, page]);
+  }, [page]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
