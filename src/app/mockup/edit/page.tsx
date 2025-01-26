@@ -143,6 +143,101 @@ const Alert = ({ message, type }: { message: string; type: string }) => {
   );
 };
 
+// Result Modal Component
+const ResultModal = ({ 
+  isOpen, 
+  message, 
+  type,
+  onClose,
+  shouldRefresh = false
+}: { 
+  isOpen: boolean; 
+  message: string; 
+  type: 'success' | 'error';
+  onClose: () => void;
+  shouldRefresh?: boolean;
+}) => {
+  const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isOpen && type === 'success' && shouldRefresh) {
+      timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            window.location.reload();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isOpen, type, shouldRefresh]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-boxdark">
+        <div className="mb-6 text-center">
+          {type === 'success' ? (
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#34D399] bg-opacity-[15%]">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M30.5968 1.65364L30.5736 1.62365L30.5482 1.5955C29.8346 0.803734 28.6476 0.801508 27.9314 1.58881L11.8378 18.9075L4.11334 10.5736C3.39712 9.78574 2.20974 9.78778 1.49599 10.5797C0.834671 11.3135 0.834671 12.4467 1.49599 13.1805L1.49592 13.1806L1.5054 13.1908L9.73484 22.0696C10.2889 22.681 11.0572 23 11.7916 23C12.5848 23 13.3036 22.671 13.848 22.07L30.4324 4.22322C31.1666 3.48904 31.152 2.37231 30.5968 1.65364Z" fill="#34D399"/>
+              </svg>
+            </div>
+          ) : (
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#F87171] bg-opacity-[15%]">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 2C8.2 2 2 8.2 2 16C2 23.8 8.2 30 16 30C23.8 30 30 23.8 30 16C30 8.2 23.8 2 16 2ZM21.4 23L16 17.6L10.6 23L9 21.4L14.4 16L9 10.6L10.6 9L16 14.4L21.4 9L23 10.6L17.6 16L23 21.4L21.4 23Z" fill="#F87171"/>
+              </svg>
+            </div>
+          )}
+          <h3 className="mb-2 text-xl font-bold text-black dark:text-white">
+            {type === 'success' ? 'Success!' : 'Error!'}
+          </h3>
+          <p className="text-body-color dark:text-body-color-dark mb-6">
+            {message}
+          </p>
+          {type === 'success' && shouldRefresh && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Refreshing in {countdown} seconds...
+            </p>
+          )}
+        </div>
+        <div className="flex justify-center gap-4">
+          {type === 'success' ? (
+            shouldRefresh ? (
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded bg-primary px-6 py-2 text-white transition hover:bg-opacity-90"
+              >
+                Refresh Now
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                className="rounded bg-primary px-6 py-2 text-white transition hover:bg-opacity-90"
+              >
+                OK
+              </button>
+            )
+          ) : (
+            <button
+              onClick={onClose}
+              className="rounded bg-primary px-6 py-2 text-white transition hover:bg-opacity-90"
+            >
+              Try Again
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const EditMockupPage = () => {
   const searchParams = useSearchParams();
   const mockupId = searchParams.get('mockupId');
@@ -197,6 +292,16 @@ const EditMockupPage = () => {
   const [areaStates, setAreaStates] = useState<Map<number, AreaState>>(new Map());
 
   const router = useRouter();
+
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'error'
+  });
 
   // Alanların mevcut durumunu kaydet
   const saveCurrentAreaStates = useCallback(() => {
@@ -581,12 +686,7 @@ const EditMockupPage = () => {
         throw new Error('Required data not available');
       }
 
-      // Görsel ölçeğini hesapla
       const imageScale = originalImageSize.width / (canvasImage.width! * canvasImage.scaleX!);
-
-      console.log('Original Image Size:', originalImageSize);
-      console.log('Canvas Image Size:', { width: canvasImage.width, height: canvasImage.height });
-      console.log('Image Scale:', imageScale);
 
       const updatePromises = groups.map(async (group) => {
         const rect = group.getObjects().find(obj => obj instanceof fabric.Rect) as DesignRect;
@@ -600,7 +700,6 @@ const EditMockupPage = () => {
         const relativeX = groupCenter.x - canvasImage.left!;
         const relativeY = groupCenter.y - canvasImage.top!;
 
-        // Scale'li boyutları hesapla
         const scaledWidth = group.width! * (group.scaleX || 1);
         const scaledHeight = group.height! * (group.scaleY || 1);
 
@@ -620,18 +719,6 @@ const EditMockupPage = () => {
           angle: group.angle || 0
         };
 
-        console.log('Sending area data for ID', rect.designAreaId, ':', areaData);
-        console.log('Group dimensions:', {
-          width: group.width,
-          height: group.height,
-          scaleX: group.scaleX,
-          scaleY: group.scaleY,
-          scaledWidth,
-          scaledHeight,
-          finalWidth: originalWidth,
-          finalHeight: originalHeight
-        });
-
         const response = await fetch(`${API_URL}/mockups/${mockupId}/design-areas/${rect.designAreaId}`, {
           method: 'PUT',
           headers: {
@@ -641,30 +728,25 @@ const EditMockupPage = () => {
           body: JSON.stringify(areaData)
         });
 
-        const responseData = await response.text();
-        console.log('Response from backend:', responseData);
-
         if (!response.ok) {
-          throw new Error(`Failed to update design area ${rect.designAreaId}: ${responseData}`);
+          throw new Error(`Failed to update design area ${rect.designAreaId}`);
         }
       });
 
       await Promise.all(updatePromises);
       
-      // Başarılı kayıttan sonra yeni durumu kaydet
       saveCurrentAreaStates();
-      
       setHasUnsavedAreaChanges(false);
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: 'Design areas updated successfully!',
         type: 'success'
       });
 
     } catch (error) {
       console.error('Error updating design areas:', error);
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: error instanceof Error ? error.message : 'Failed to update design areas',
         type: 'error'
       });
@@ -675,14 +757,10 @@ const EditMockupPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // Eğer area değişiklikleri varsa, önce onları kaydet
     if (hasUnsavedAreaChanges) {
-      setAlertState({
-        show: true,
-        message: 'Please save design area changes first!',
-        type: 'warning'
-      });
-      return;
+      await handleSaveAreas();
     }
 
     try {
@@ -716,26 +794,25 @@ const EditMockupPage = () => {
         },
         body: formDataToSend,
       });
-
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText);
+        throw new Error('Failed to update mockup');
       }
 
       const result = await response.json();
 
       if (result.success) {
-        setAlertState({
-          show: true,
-          message: 'Mockup updated successfully!',
+        setModalState({
+          isOpen: true,
+          message: 'All changes saved successfully!',
           type: 'success'
         });
       }
 
     } catch (error) {
       console.error('Error updating mockup:', error);
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: error instanceof Error ? error.message : 'Failed to update mockup',
         type: 'error'
       });
@@ -766,26 +843,25 @@ const EditMockupPage = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-
+      
       if (!response.ok) {
         throw new Error('Failed to delete design area');
       }
 
-      // Canvas'tan area'yı kaldır
       canvas?.remove(selectedGroup);
       setSelectedGroup(null);
       canvas?.renderAll();
 
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: 'Design area deleted successfully!',
         type: 'success'
       });
 
     } catch (error) {
       console.error('Error deleting design area:', error);
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: error instanceof Error ? error.message : 'Failed to delete design area',
         type: 'error'
       });
@@ -860,7 +936,6 @@ const EditMockupPage = () => {
       const rect = activeGroup.getObjects().find(obj => obj instanceof fabric.Rect) as DesignRect;
       const groupCenter = activeGroup.getCenterPoint();
 
-      // Görsel ölçeğini hesapla
       const imageScale = originalImageSize.width / (canvasImage.width! * canvasImage.scaleX!);
       
       const relativeX = groupCenter.x - canvasImage.left!;
@@ -895,20 +970,19 @@ const EditMockupPage = () => {
         throw new Error('Failed to add design area');
       }
 
-      // Başarılı olduktan sonra area'ları yeniden yükle
       await fetchMockupData(mockupId);
       setIsNewAreaPending(false);
 
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: 'Design area added successfully!',
         type: 'success'
       });
 
     } catch (error) {
       console.error('Error adding design area:', error);
-      setAlertState({
-        show: true,
+      setModalState({
+        isOpen: true,
         message: error instanceof Error ? error.message : 'Failed to add design area',
         type: 'error'
       });
@@ -941,11 +1015,18 @@ const EditMockupPage = () => {
   return (
     <Layout>
       {isLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
           <Loader />
         </div>
       )}
       
+      <ResultModal
+        isOpen={modalState.isOpen}
+        message={modalState.message}
+        type={modalState.type}
+        onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+      />
+
       <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-black dark:text-white">
@@ -963,13 +1044,6 @@ const EditMockupPage = () => {
             </ol>
           </nav>
         </div>
-
-        {alertState.show && (
-          <Alert 
-            message={alertState.message} 
-            type={alertState.type} 
-          />
-        )}
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Canvas Bölümü */}

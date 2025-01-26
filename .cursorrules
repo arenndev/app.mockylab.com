@@ -85,7 +85,28 @@
         "category",
         "designColor",
         "designAreas"
-      ]
+      ],
+      "edit_flow": {
+        "area_operations": {
+          "add": "Create new design area with name and default size",
+          "save": "Update area dimensions and position",
+          "delete": "Remove area from mockup"
+        },
+        "form_operations": {
+          "update": "Modify mockup details and image",
+          "validation": "Check for unsaved area changes before form submission"
+        },
+        "notifications": {
+          "area_changes": {
+            "success": "Show success message without page refresh",
+            "error": "Display error with retry option"
+          },
+          "form_changes": {
+            "success": "Show success message with auto-refresh",
+            "error": "Display error with retry option"
+          }
+        }
+      }
     }
   },
   "conventions": {
