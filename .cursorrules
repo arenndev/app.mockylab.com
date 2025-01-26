@@ -7,7 +7,7 @@
   "architecture": {
     "routing": {
       "base": "/src/app",
-      "protected_routes": ["/mockup/*", "/printify/*", "/profile/*", "/settings/*"],
+      "protected_routes": ["/mockup/*", "/printify/*", "/profile/*", "/settings/*", "/desingcreate"],
       "public_routes": ["/login", "/"],
       "auth_redirect": {
         "default": "/mockup/list",
@@ -31,6 +31,13 @@
           "design_areas": "/mockups/{mockupId}/design-areas",
           "user": "/UserOfMockup",
           "generate": "/Mockup/generate"
+        },
+        "ideogram": {
+          "get_description": "/Ideogram/get-description",
+          "remix": "/Ideogram/remix",
+          "remove_background": "/Ideogram/remove-background",
+          "download_image": "/Ideogram/download-image",
+          "get_processed_image": "/Ideogram/get-processed-image"
         }
       }
     }
@@ -101,6 +108,52 @@
         "Black": 0,
         "White": 1,
         "Color": 2
+      }
+    },
+    "design_create": {
+      "flow": [
+        "Upload original image",
+        "Get AI description",
+        "Edit description (optional)",
+        "Generate remixed image",
+        "Remove background (optional)",
+        "Download with/without background"
+      ],
+      "image_processing": {
+        "supported_formats": ["image/*"],
+        "max_file_size": "10MB",
+        "preview_dimensions": {
+          "height": "400px",
+          "width": "100%",
+          "object_fit": "contain"
+        }
+      },
+      "api_integration": {
+        "description": "Uses Ideogram API for image processing and remixing",
+        "endpoints": {
+          "get_description": {
+            "method": "POST",
+            "content_type": "multipart/form-data",
+            "response": {
+              "description": "string",
+              "tempPath": "string"
+            }
+          },
+          "remix": {
+            "method": "POST",
+            "content_type": "multipart/form-data",
+            "response": {
+              "remixImageUrl": "string"
+            }
+          },
+          "remove_background": {
+            "method": "POST",
+            "content_type": "application/json",
+            "response": {
+              "backgroundRemovedImageUrl": "string"
+            }
+          }
+        }
       }
     }
   },

@@ -121,38 +121,41 @@ export default function DesignCreate() {
         return;
       }
 
-      const params = new URLSearchParams();
-      params.append("description", description);
-      params.append("tempImagePath", tempPath);
+      const formData = new FormData();
+      formData.append('description', description);
+      formData.append('tempImagePath', tempPath);
 
-      console.log("Sending params:", {
+      // Log the request data
+      console.log("Sending request with data:", {
         description: description,
         tempImagePath: tempPath
       });
 
-      const response = await axios.post(`${API_URL}/Ideogram/remix`, params, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
+      const response = await axios.post(
+        `${API_URL}/Ideogram/remix`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         }
-      });
+      );
 
-      console.log("Remix API Response:", response.data);
-      setRemixedImageUrl(response.data.remixImageUrl);
-      
-      if (response.data.remixImageUrl) {
-        await handleBackgroundRemoval(response.data.remixImageUrl);
+      console.log("Full API Response:", response);
+      if (response.data && response.data.remixImageUrl) {
+        setRemixedImageUrl(response.data.remixImageUrl);
+      } else {
+        console.error("Unexpected API response format:", response.data);
       }
     } catch (error: any) {
       console.error("Error remixing image:", error);
       if (error.response) {
-        console.error("Server Error Data:", error.response.data);
-        console.error("Server Error Status:", error.response.status);
-        console.error("Server Error Headers:", error.response.headers);
-      } else if (error.request) {
-        console.error("No response received:", error.request);
-      } else {
-        console.error("Error setting up request:", error.message);
+        console.error("Full Error Response:", error.response);
+        console.error("Error Response Data:", error.response.data);
+        console.error("Error Response Headers:", error.response.headers);
+        console.error("Error Response Status:", error.response.status);
+        // Add user-friendly error message
+        alert(error.response.data || "Failed to remix image. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -287,15 +290,15 @@ export default function DesignCreate() {
 
                   {remixedImageUrl && (
                     <div>
-                      <div className="flex justify-between items-center mb-2.5">
-                        <h4 className="text-black dark:text-white">
+                      <div className="flex flex-col gap-4 mb-4">
+                        <h4 className="text-black dark:text-white font-medium">
                           Remixed Image
                         </h4>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-3">
                           <button
-                            onClick={() => handleDownload(true)}
-                            disabled={isLoading}
-                            className="flex items-center gap-2 rounded bg-primary px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
+                            onClick={() => handleBackgroundRemoval(remixedImageUrl)}
+                            disabled={isLoading || isRemovingBackground || !remixedImageUrl}
+                            className="inline-flex items-center gap-2 rounded bg-warning px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
                           >
                             <svg
                               className="w-4 h-4"
@@ -308,35 +311,59 @@ export default function DesignCreate() {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth="2"
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                               />
                             </svg>
-                            {isLoading ? "Downloading..." : "Download with Background"}
+                            {isRemovingBackground ? "Processing..." : "Remove Background"}
                           </button>
-                          
-                          <button
-                            onClick={() => handleDownload(false)}
-                            disabled={isLoading || isRemovingBackground || !backgroundRemovedImageUrl}
-                            className="flex items-center gap-2 rounded bg-success px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              xmlns="http://www.w3.org/2000/svg"
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleDownload(true)}
+                              disabled={isLoading}
+                              className="inline-flex items-center gap-2 rounded bg-primary px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                              />
-                            </svg>
-                            {isLoading ? "Downloading..." : 
-                             isRemovingBackground ? "Removing Background..." : 
-                             "Download without Background"}
-                          </button>
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                />
+                              </svg>
+                              {isLoading ? "Downloading..." : "Download Original"}
+                            </button>
+                            
+                            {backgroundRemovedImageUrl && (
+                              <button
+                                onClick={() => handleDownload(false)}
+                                disabled={isLoading}
+                                className="inline-flex items-center gap-2 rounded bg-success px-4 py-2 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-50"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                  />
+                                </svg>
+                                {isLoading ? "Downloading..." : "Download No Background"}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="relative h-[400px] w-full rounded-sm border border-stroke dark:border-strokedark">
@@ -344,6 +371,7 @@ export default function DesignCreate() {
                           src={remixedImageUrl}
                           alt="Remixed"
                           fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                           className="object-contain p-2"
                         />
                       </div>
