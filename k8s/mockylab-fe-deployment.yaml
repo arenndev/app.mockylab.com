@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: mockylab-fe
-        image: ghcr.io/arenndev/mockylab-fe:latest
+        image: arenumut/mockylab-fe:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
@@ -54,7 +54,7 @@ spec:
             cpu: "200m"
             memory: "256Mi"
       imagePullSecrets:
-      - name: ghcr-secret
+      - name: dockerhub-secret
       nodeSelector:
         kubernetes.io/arch: amd64
   strategy:
