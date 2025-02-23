@@ -4,11 +4,10 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Package dosyalarını kopyala
-COPY package*.json ./
-COPY yarn.lock ./
+COPY package.json yarn.lock ./
 
 # Dependencies'leri yükle
-RUN npm install --legacy-peer-deps
+RUN yarn install --frozen-lockfile
 
 # Kaynak kodları kopyala
 COPY . .
@@ -16,7 +15,7 @@ COPY . .
 # Build al
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-RUN npm run build
+RUN yarn build
 
 # Stage 2: Production aşaması
 FROM node:18-alpine AS runner

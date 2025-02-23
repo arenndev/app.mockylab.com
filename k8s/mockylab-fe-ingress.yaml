@@ -6,6 +6,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
     traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
     traefik.ingress.kubernetes.io/router.tls: "true"
+    kubernetes.io/ingress.class: traefik
   name: mockylab-fe-ingress
   namespace: default
 spec:
@@ -14,13 +15,13 @@ spec:
     - host: app.mockylab.com
       http:
         paths:
-          - backend:
+          - path: /
+            pathType: Prefix
+            backend:
               service:
                 name: mockylab-fe-service
                 port:
                   number: 80
-            path: /
-            pathType: Prefix
   tls:
     - hosts:
         - app.mockylab.com
