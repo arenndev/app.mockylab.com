@@ -18,17 +18,17 @@ spec:
       containers:
       - name: mockylab-fe
         image: ghcr.io/arenndev/mockylab-fe:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 3000
           name: http
         resources:
           limits:
+            cpu: "400m"
+            memory: "512Mi"
+          requests:
             cpu: "200m"
             memory: "256Mi"
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
         env:
         - name: NEXT_PUBLIC_API_URL
           value: "https://api.mockylab.com"
@@ -49,4 +49,9 @@ spec:
       imagePullSecrets:
       - name: ghcr-secret
       nodeSelector:
-        kubernetes.io/arch: amd64 
+        kubernetes.io/arch: amd64
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 
