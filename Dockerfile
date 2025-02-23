@@ -5,8 +5,10 @@ WORKDIR /app
 
 # Package dosyalarını kopyala
 COPY package*.json ./
-# Sadece production dependencies'leri yükle
-RUN npm ci
+COPY yarn.lock ./
+
+# Dependencies'leri yükle
+RUN npm install --legacy-peer-deps
 
 # Kaynak kodları kopyala
 COPY . .
