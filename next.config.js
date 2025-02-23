@@ -11,12 +11,11 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'
   },
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
     return [
       {
-        source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`
-      }
+        source: '/:path*',
+        destination: '/:path*',
+      },
     ]
   },
   images: {

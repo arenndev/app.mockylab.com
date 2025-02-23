@@ -38,6 +38,8 @@ jobs:
           build-args: |
             NODE_ENV=production
             NEXT_TELEMETRY_DISABLED=1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Setup kubectl
         run: |
@@ -56,13 +58,12 @@ jobs:
       - name: Update Deployment
         run: |
           kubectl rollout restart deployment/mockylab-fe-deployment
-          kubectl rollout status deployment/mockylab-fe-deployment
+          kubectl rollout status deployment/mockylab-fe-deployment --timeout=300s
 
       - name: Apply Kubernetes manifests
         run: |
           kubectl apply -f k8s/mockylab-fe-deployment.yaml
           kubectl apply -f k8s/mockylab-fe-service.yaml
-          kubectl apply -f k8s/fe-http-middleware.yaml
-          kubectl apply -f k8s/mockylab-fe-ingress.yaml
-          kubectl apply -f k8s/mockylab-fe-networkpolicy.yaml
-          kubectl apply -f k8s/mockylab-fe-hpa.yaml 
+          kubectl apply -f k8s/headers-middleware.yaml
+          kubectl apply -f k8s/mockylab-fe-ingressroute.yaml
+          kubectl apply -f k8s/mockylab-fe-networkpolicy.yaml 

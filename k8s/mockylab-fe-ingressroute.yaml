@@ -1,1 +1,19 @@
- 
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mockylab-fe-route
+  namespace: default
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`app.mockylab.com`)
+      kind: Rule
+      services:
+        - name: mockylab-fe-service
+          port: 80
+      middlewares:
+        - name: redirect-https
+        - name: default-headers
+  tls: {}  # Cloudflare yönettiği için boş bırakıyoruz 
