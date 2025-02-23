@@ -5,12 +5,13 @@ metadata:
   namespace: default
   labels:
     app: mockylab-fe
+  annotations:
+    traefik.ingress.kubernetes.io/service-weights: "100"
 spec:
   type: ClusterIP
   ports:
-    - port: 80
+    - protocol: TCP
+      port: 80
       targetPort: 3000
-      protocol: TCP
-      name: http
   selector:
     app: mockylab-fe 
