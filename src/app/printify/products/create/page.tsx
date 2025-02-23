@@ -8,7 +8,7 @@ import BlueprintSelectModal from '@/components/Modals/BlueprintSelectModal';
 import VariantSelectModal from '@/components/Modals/VariantSelectModal';
 import { authService } from '@/services/authService';
 import { printifyService } from '@/services/printifyService';
-import type { Blueprint as PrintifyBlueprint, BlueprintVariant, UserOfVariant } from '@/types/printify';
+import type { Blueprint as PrintifyBlueprint, BlueprintVariant, UserOfVariant, VariantImages } from '@/types/printify';
 
 interface Blueprint extends PrintifyBlueprint {
     variants: (BlueprintVariant & {
@@ -26,10 +26,11 @@ interface CreateProductForm {
         variantId: number;
         price: number;
         isEnabled: boolean;
+        designColor: number;
     }[];
-    printifyImageId: string;
-    catalogImageIds?: string[];
-    userId?: string;
+    designImages: {
+        [key: number]: string;
+    };
 }
 
 const CreateProduct = () => {
@@ -43,7 +44,7 @@ const CreateProduct = () => {
         tags: [],
         blueprintId: 0,
         variants: [],
-        printifyImageId: ''
+        designImages: {}
     });
 
     // Modal states
@@ -127,13 +128,64 @@ const CreateProduct = () => {
             variants: variants.map(v => ({
                 variantId: v.variantId,
                 price: v.price,
-                isEnabled: true
+                isEnabled: true,
+                designColor: 0
             }))
         }));
         setIsVariantModalOpen(false);
     };
 
-    // Form gönderme
+    // Görsel yükleme fonksiyonunu güncelle
+    const handleImageUpload = async (file: File, colorIndex: number) => {
+        try {
+            setLoading(true);
+            setError(null);
+            
+            const userId = authService.getUserId();
+            if (!userId) {
+                throw new Error('No user information available');
+            }
+
+            const formData = new FormData();
+            formData.append('ImageFile', file);
+            formData.append('FileName', file.name);
+            formData.append('UserId', userId);
+
+            const response = await printifyService.uploadImage(formData);
+
+            if (!response.success || !response.data) {
+                throw new Error(response.message || 'Failed to upload image');
+            }
+
+            const { printifyImageId } = response.data;
+
+            setFormData(prev => ({
+                ...prev,
+                designImages: {
+                    ...prev.designImages,
+                    [colorIndex]: printifyImageId
+                }
+            }));
+
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            setError(error instanceof Error ? error.message : 'Failed to upload image');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Renk adını almak için yardımcı fonksiyon
+    const getColorName = (colorIndex: number): string => {
+        switch (colorIndex) {
+            case 0: return 'Black';
+            case 1: return 'White';
+            case 2: return 'Color';
+            default: return 'Unknown';
+        }
+    };
+
+    // Form gönderme fonksiyonunu güncelle
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -141,14 +193,6 @@ const CreateProduct = () => {
 
         try {
             // Form validasyonu
-            if (!formData.blueprintId) {
-                throw new Error('Please select a blueprint');
-            }
-
-            if (!formData.variants || formData.variants.length === 0) {
-                throw new Error('Please select at least one variant');
-            }
-
             if (!formData.title.trim()) {
                 throw new Error('Please enter a product title');
             }
@@ -157,30 +201,51 @@ const CreateProduct = () => {
                 throw new Error('Please enter a product description');
             }
 
-            if (!formData.printifyImageId) {
-                throw new Error('Please upload a product image');
+            if (!formData.blueprintId) {
+                throw new Error('Please select a blueprint');
             }
 
-            // Kullanıcı kontrolü
             const userId = authService.getUserId();
             if (!userId) {
                 throw new Error('User authentication error');
             }
 
-            // Create product
-            const response = await printifyService.createProduct({
-                title: formData.title,
-                description: formData.description,
-                tags: formData.tags,
+            // Request'i console'a yazdır
+            const request = {
+                title: formData.title.trim(),
+                description: formData.description.trim(),
                 blueprintId: formData.blueprintId,
-                variants: formData.variants.map(v => ({
-                    variantId: v.variantId,
-                    price: v.price,
-                    isEnabled: v.isEnabled
-                })),
-                printifyImageId: formData.printifyImageId,
-                userId: userId
+                variantImages: formData.designImages[2] 
+                    ? {
+                        // Color tasarımı varsa, tüm varyantlar için onu kullan
+                        black: formData.designImages[2],
+                        white: formData.designImages[2]
+                    }
+                    : {
+                        // Color tasarımı yoksa normal black/white tasarımlarını kullan
+                        black: formData.designImages[0],
+                        white: formData.designImages[1]
+                    },
+                tags: formData.tags.length === 0 ? ['custom', 't-shirt'] : formData.tags,
+                userId: parseInt(userId)
+            };
+
+            // Boş değerleri temizle
+            (Object.keys(request.variantImages) as Array<keyof VariantImages>).forEach(key => {
+                if (!request.variantImages[key]) {
+                    delete request.variantImages[key];
+                }
             });
+
+            // En az bir tasarım olmalı
+            if (Object.keys(request.variantImages).length === 0) {
+                throw new Error('Please upload at least one design image');
+            }
+
+            console.log('Create Product Request:', request);
+
+            // Create product
+            const response = await printifyService.createProduct(request);
 
             if (response.success) {
                 setFormData({
@@ -189,7 +254,7 @@ const CreateProduct = () => {
                     tags: [],
                     blueprintId: 0,
                     variants: [],
-                    printifyImageId: ''
+                    designImages: {}
                 });
                 setSelectedBlueprint(null);
                 alert('Product created successfully!');
@@ -348,60 +413,39 @@ const CreateProduct = () => {
                             </div>
                         </div>
 
-                        {/* Image Upload */}
-                        <div>
-                            <label className="mb-2.5 block text-black dark:text-white">Product Image</label>
-                            <div className="flex flex-col gap-4">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={async (e) => {
-                                        if (e.target.files && e.target.files[0]) {
-                                            try {
-                                                setLoading(true);
-                                                setError(null);
-                                                
-                                                const userId = authService.getUserId();
-                                                if (!userId) {
-                                                    throw new Error('No user information available');
-                                                }
-
-                                                const file = e.target.files[0];
-                                                const formData = new FormData();
-                                                formData.append('ImageFile', file);
-                                                formData.append('FileName', file.name);
-                                                formData.append('UserId', userId);
-
-                                                const response = await printifyService.uploadImage(formData);
-
-                                                if (!response.success || !response.data) {
-                                                    throw new Error(response.message || 'Failed to upload image');
-                                                }
-
-                                                const { printifyImageId } = response.data;
-                                                if (!printifyImageId) {
-                                                    throw new Error('No printify image ID received');
-                                                }
-
-                                                setFormData(prev => ({ 
-                                                    ...prev, 
-                                                    printifyImageId
-                                                }));
-                                            } catch (error) {
-                                                console.error('Error uploading image:', error);
-                                                setError(error instanceof Error ? error.message : 'Failed to upload image');
-                                            } finally {
-                                                setLoading(false);
-                                            }
-                                        }
-                                    }}
-                                    className="w-full rounded border-[1.5px] border-stroke bg-transparent px-5 py-3 font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:px-5 file:py-2 file:hover:bg-primary file:hover:bg-opacity-10 disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white"
-                                />
-                                {formData.printifyImageId && (
-                                    <div className="text-sm text-success">
-                                        Image uploaded successfully
+                        {/* Design Images */}
+                        <div className="mb-4">
+                            <h3 className="mb-2.5 block font-medium text-black dark:text-white">
+                                Design Images
+                            </h3>
+                            <p className="text-sm text-gray-500 mb-4">
+                                Note: If you upload a color design, it will be used for both black and white variants. Otherwise, black and white designs will be used for their respective variants.
+                            </p>
+                            <div className="grid grid-cols-3 gap-4">
+                                {([0, 1, 2] as const).map(colorIndex => (
+                                    <div key={colorIndex} className="flex flex-col items-center">
+                                        <label className="mb-2">
+                                            {getColorName(colorIndex)} Design
+                                            {colorIndex === 2 && (
+                                                <span className="text-xs text-gray-500 block">
+                                                    (Will be used as black design)
+                                                </span>
+                                            )}
+                                        </label>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleImageUpload(file, colorIndex);
+                                            }}
+                                            className="w-full"
+                                        />
+                                        {formData.designImages[colorIndex] && (
+                                            <span className="text-success mt-2">✓ Uploaded</span>
+                                        )}
                                     </div>
-                                )}
+                                ))}
                             </div>
                         </div>
 
@@ -430,16 +474,13 @@ const CreateProduct = () => {
             />
 
             {selectedBlueprint && (
-                <>
-                    {console.log('Variants being passed to modal:', selectedBlueprint.variants)}
-                    <VariantSelectModal
-                        isOpen={isVariantModalOpen}
-                        onClose={() => setIsVariantModalOpen(false)}
-                        variants={selectedBlueprint.variants}
-                        selectedVariants={formData.variants}
-                        onVariantsSelect={handleVariantsSelect}
-                    />
-                </>
+                <VariantSelectModal
+                    isOpen={isVariantModalOpen}
+                    onClose={() => setIsVariantModalOpen(false)}
+                    variants={selectedBlueprint.variants}
+                    selectedVariants={formData.variants}
+                    onVariantsSelect={handleVariantsSelect}
+                />
             )}
         </DefaultLayout>
     );

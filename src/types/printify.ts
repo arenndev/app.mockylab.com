@@ -55,19 +55,19 @@ export interface VariantResponse {
   hasPreviousPage: boolean;
 }
 
+export interface VariantImages {
+  black: string;
+  white: string;
+  color?: string;
+}
+
 export interface CreateProductRequest {
   title: string;
   description: string;
-  tags: string[];
   blueprintId: number;
-  variants: {
-    variantId: number;
-    price: number;
-    isEnabled: boolean;
-  }[];
-  printifyImageId: string;
-  catalogImageIds?: string[];
-  userId?: string;
+  variantImages: VariantImages;
+  tags: string[];
+  userId: number;
 }
 
 export interface PrintifyApiResponse<T> {
@@ -85,8 +85,9 @@ export interface UserOfVariant {
   defaultPrice: number;
   isEnabled: boolean;
   isActive: boolean;
+  designColor: number;
   createdAt: string;
-  updatedAt: string;
+  updatedAt: string | null;
 }
 
 export interface ProductImage {
@@ -111,4 +112,54 @@ export interface PaginatedResponse<T> {
   lastPage: number;
   total: number;
   perPage: number;
+}
+
+export interface UpdateVariantRequest {
+  id: number;
+  defaultPrice: number;
+  isEnabled: boolean;
+  isActive: boolean;
+  designColor: number;
+}
+
+export interface CreateVariantRequest {
+  userId: number;
+  blueprintId: number;
+  variantId: number;
+  defaultPrice: number;
+  isEnabled: boolean;
+  designColor: number;
+}
+
+export const DesignColorEnum = {
+  Black: 0,
+  White: 1,
+  Color: 2
+} as const;
+
+export type DesignColorEnum = typeof DesignColorEnum[keyof typeof DesignColorEnum];
+
+// Bulk operations için yeni interface'ler
+export interface BulkOperationUpdateRequest {
+  id: number;
+  defaultPrice: number;
+  isEnabled: boolean;
+  isActive: boolean;
+  isSelected: boolean;
+  designColor: number;
+}
+
+export interface BulkOperationCreateRequest {
+  userId: number;
+  blueprintId: number;
+  variantId: number;
+  defaultPrice: number;
+  isEnabled: boolean;
+  isSelected: boolean;
+  designColor: number;
+}
+
+export interface BulkOperationsRequest {
+  updateRequests?: BulkOperationUpdateRequest[];
+  createRequests?: BulkOperationCreateRequest[];
 } 

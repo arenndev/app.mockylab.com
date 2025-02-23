@@ -13,6 +13,7 @@ interface VariantSelection {
     variantId: number;
     price: number;
     isEnabled: boolean;
+    designColor: number;
 }
 
 interface Props {
@@ -29,7 +30,8 @@ const VariantSelectModal = ({ isOpen, onClose, variants, selectedVariants, onVar
         variants.map(variant => ({
             variantId: variant.variantId,
             price: selectedVariants.find(v => v.variantId === variant.variantId)?.price || 30.00,
-            isEnabled: selectedVariants.some(v => v.variantId === variant.variantId && v.isEnabled)
+            isEnabled: selectedVariants.some(v => v.variantId === variant.variantId && v.isEnabled),
+            designColor: selectedVariants.find(v => v.variantId === variant.variantId)?.designColor || 0
         }))
     );
     const [currentPage, setCurrentPage] = useState(1);
@@ -41,7 +43,8 @@ const VariantSelectModal = ({ isOpen, onClose, variants, selectedVariants, onVar
             setLocalVariants(variants.map(variant => ({
                 variantId: variant.variantId,
                 price: selectedVariants.find(v => v.variantId === variant.variantId)?.price || 30.00,
-                isEnabled: selectedVariants.some(v => v.variantId === variant.variantId && v.isEnabled)
+                isEnabled: selectedVariants.some(v => v.variantId === variant.variantId && v.isEnabled),
+                designColor: selectedVariants.find(v => v.variantId === variant.variantId)?.designColor || 0
             })));
         }
     }, [isOpen, variants, selectedVariants]);
@@ -105,42 +108,50 @@ const VariantSelectModal = ({ isOpen, onClose, variants, selectedVariants, onVar
         setLocalVariants(prev => {
             const index = prev.findIndex(v => v.variantId === variant.variantId);
             if (index >= 0) {
-                // Varyant zaten listede var
                 const newVariants = [...prev];
                 if (newVariants[index].isEnabled) {
-                    // Varyant aktifse, listeden çıkar
                     return newVariants.filter(v => v.variantId !== variant.variantId);
                 } else {
-                    // Varyant pasifse, aktif yap
                     newVariants[index] = {
                         ...newVariants[index],
-                        isEnabled: true
+                        isEnabled: true,
+                        designColor: determineDesignColor(variant)
                     };
                     return newVariants;
                 }
             }
-            // Varyant listede yoksa, ekle
             return [...prev, {
                 variantId: variant.variantId,
                 price: 30.00,
-                isEnabled: true
+                isEnabled: true,
+                designColor: determineDesignColor(variant)
             }];
         });
     };
 
+    const determineDesignColor = (variant: BlueprintVariant): number => {
+        const colorName = variant.options?.color?.toLowerCase() || '';
+        if (colorName.includes('black')) return 0;
+        if (colorName.includes('white')) return 1;
+        return 2;
+    };
+
     const handlePriceChange = (variantId: number, price: number) => {
-        setLocalVariants(prev =>
-            prev.map(v =>
-                v.variantId === variantId
-                    ? { ...v, price }
-                    : v
-            )
-        );
+        if (isNaN(price) || price < 0) return;
+        
+        setLocalVariants(prev => prev.map(v => 
+            v.variantId === variantId ? { ...v, price } : v
+        ));
     };
 
     const handleSave = () => {
         onVariantsSelect(localVariants);
         onClose();
+    };
+
+    // Benzersiz key oluşturmak için yardımcı fonksiyon
+    const createUniqueKey = (variant: BlueprintVariant, index: number): string => {
+        return `variant-${variant.variantId}-${index}-${Date.now()}`;
     };
 
     if (!isOpen) return null;
@@ -175,53 +186,48 @@ const VariantSelectModal = ({ isOpen, onClose, variants, selectedVariants, onVar
                 <div className="max-h-[60vh] overflow-y-auto">
                     <div className="space-y-4">
                         {Object.entries(currentVariants).map(([color, variants]) => (
-                            <div key={color}>
-                                <h4 className="text-black dark:text-white font-medium mb-2">
-                                    {color}
-                                </h4>
-                                <div className="space-y-4">
-                                    {variants.map(variant => {
-                                        const selected = localVariants.find(v => v.variantId === variant.variantId);
-                                        return (
-                                            <div
-                                                key={variant.id}
-                                                className="border border-stroke dark:border-strokedark rounded-sm p-4"
-                                            >
+                            <div key={`color-group-${color}`} className="mb-6">
+                                <h3 className="text-lg font-semibold mb-3">{color}</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {variants.map((variant, index) => (
+                                        <div 
+                                            key={createUniqueKey(variant, index)} 
+                                            className="border border-stroke dark:border-strokedark rounded-sm p-4"
+                                        >
+                                            <div className="flex flex-col gap-4">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-4">
                                                         <input
                                                             type="checkbox"
-                                                            checked={selected?.isEnabled ?? false}
+                                                            checked={localVariants.some(v => v.variantId === variant.variantId && v.isEnabled)}
                                                             onChange={() => handleVariantToggle(variant)}
                                                             className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
                                                         />
-                                                        <div>
-                                                            <h5 className="text-black dark:text-white font-medium">
-                                                                {variant.title}
-                                                            </h5>
-                                                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                                {Object.entries(variant.options).map(([key, value]) => (
-                                                                    <span key={key} className="mr-2">
-                                                                        {key}: {value}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        </div>
+                                                        <h5 className="text-black dark:text-white font-medium">
+                                                            {variant.title}
+                                                        </h5>
                                                     </div>
-                                                    {selected?.isEnabled && (
+                                                    {localVariants.some(v => v.variantId === variant.variantId) && (
                                                         <input
                                                             type="number"
                                                             step="0.01"
                                                             min="0"
-                                                            value={selected.price}
+                                                            value={localVariants.find(v => v.variantId === variant.variantId)?.price || 30.00}
                                                             onChange={(e) => handlePriceChange(variant.variantId, parseFloat(e.target.value))}
-                                                            className="w-24 rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 font-medium outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-whiter dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
+                                                            className="w-24 rounded border-[1.5px] border-stroke bg-transparent py-2 px-3"
                                                         />
                                                     )}
                                                 </div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {Object.entries(variant.options).map(([key, value]) => (
+                                                        <span key={`${variant.variantId}-${key}`} className="mr-2">
+                                                            {key}: {String(value)}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         ))}

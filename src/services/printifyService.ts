@@ -9,7 +9,9 @@ import {
   PrintifyApiResponse,
   BlueprintVariant,
   PaginatedResponse,
-  Product
+  Product,
+  UpdateVariantRequest,
+  BulkOperationsRequest
 } from '@/types/printify';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
@@ -59,6 +61,19 @@ const ENDPOINTS = {
   }
 };
 
+interface CreateProductRequest {
+    title: string;
+    description: string;
+    blueprintId: number;
+    variantImages: {
+        black: string | undefined;
+        white: string | undefined;
+        color: string | undefined;
+    };
+    tags: string[];
+    userId: number;
+}
+
 class PrintifyService {
   private shopId: string | null = null;
 
@@ -90,28 +105,13 @@ class PrintifyService {
     }
   }
 
-  private handleError(error: unknown) {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<any>;
-      
-      // API key hatası
-      if (axiosError.response?.status === 400) {
-        if (typeof axiosError.response?.data === 'string' && axiosError.response?.data.includes('API key not found')) {
-          throw new Error('Printify API key not found. Please configure it in settings.');
-        }
-        throw new Error(axiosError.response?.data?.message || axiosError.response?.data || 'Bad request');
-      }
-      
-      // Blueprint bulunamadı hatası
-      if (axiosError.response?.status === 500 && typeof axiosError.response?.data === 'string' && axiosError.response?.data.includes('404')) {
-        throw new Error('Blueprint not found on Printify. It might have been deleted or is temporarily unavailable.');
-      }
-
-      // Diğer API hataları
-      throw new Error(axiosError.response?.data?.message || axiosError.message || 'An error occurred');
+  private handleError(error: unknown): never {
+    if (axios.isAxiosError(error) && error.response?.data) {
+        console.error('API Error:', error.response.data);
+        throw new Error(error.response.data.message || 'API request failed');
     }
-    
-    throw error;
+    console.error('Service Error:', error);
+    throw error instanceof Error ? error : new Error('An unexpected error occurred');
   }
 
   // Settings
@@ -223,16 +223,51 @@ class PrintifyService {
   }
 
   // Products
-  async createProduct(data: CreateProductRequest): Promise<PrintifyApiResponse<any>> {
+  async createProduct(data: CreateProductRequest): Promise<any> {
     try {
-      const response = await axios.post<PrintifyApiResponse<any>>(
-        `${API_URL}${ENDPOINTS.products.create}`,
-        data,
-        { headers: this.getHeaders() }
-      );
-      return response.data;
+        console.log('Creating product with data:', data);
+
+        // API'nin beklediği formata dönüştür
+        const requestBody = {
+            title: data.title,
+            description: data.description,
+            blueprintId: data.blueprintId,
+            variantImages: {
+                black: data.variantImages.black || undefined,
+                white: data.variantImages.white || undefined
+                // color anahtarını kaldırdık
+            },
+            tags: data.tags || [],
+            userId: data.userId
+        };
+
+        // Boş değerleri temizle
+        if (!requestBody.variantImages.black) delete requestBody.variantImages.black;
+        if (!requestBody.variantImages.white) delete requestBody.variantImages.white;
+
+        // Request'i yazdır
+        console.log('Sending request with body:', JSON.stringify(requestBody, null, 2));
+
+        const response = await axios.post(
+            `${API_URL}/api/Printify/products`,
+            requestBody,
+            { 
+                headers: {
+                    ...this.getHeaders(),
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        console.log('Create product response:', response.data);
+        return response.data;
     } catch (error) {
-      throw this.handleError(error);
+        console.error('Create product error:', error);
+        if (axios.isAxiosError(error) && error.response?.data) {
+            console.error('Error response:', error.response.data);
+            throw new Error(error.response.data.message || 'Failed to create product');
+        }
+        throw this.handleError(error);
     }
   }
 
@@ -352,6 +387,7 @@ class PrintifyService {
     variantId: number;
     defaultPrice: number;
     isEnabled: boolean;
+    designColor: 'Black' | 'White' | 'Color';
   }) {
     try {
       const response = await axios.post(
@@ -371,10 +407,11 @@ class PrintifyService {
     variantId: number;
     defaultPrice: number;
     isEnabled: boolean;
+    designColor: 'Black' | 'White' | 'Color';
   }[]) {
     try {
       const response = await axios.post(
-        `${API_URL}${ENDPOINTS.userVariants.createBulk}`,
+        `${API_URL}/api/UserOfVariant/bulk`,
         data,
         { headers: this.getHeaders() }
       );
@@ -388,6 +425,7 @@ class PrintifyService {
     defaultPrice: number;
     isEnabled: boolean;
     isActive: boolean;
+    designColor: 'Black' | 'White' | 'Color';
   }) {
     try {
       const response = await axios.put(
@@ -465,6 +503,34 @@ class PrintifyService {
       const response = await axios.post(
         `${API_URL}${ENDPOINTS.products.updateTags(shopId, productId)}`,
         { tags },
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // Bulk update methodunu güncelle
+  async updateUserVariantsBulk(updates: UpdateVariantRequest[]) {
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/UserOfVariant/bulk-update`,
+        updates,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  // Yeni bulk operations methodu
+  async bulkOperations(data: BulkOperationsRequest) {
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/UserOfVariant/bulk-operations`,
+        data,
         { headers: this.getHeaders() }
       );
       return response.data;
