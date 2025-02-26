@@ -9,4 +9,21 @@ spec:
     forceSTSHeader: true
     stsIncludeSubdomains: true
     stsPreload: true
-    stsSeconds: 31536000 
+    stsSeconds: 31536000
+    accessControlAllowMethods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    accessControlAllowOriginList:
+      - "http://localhost:3000"
+      - "https://app.mockylab.com"
+    accessControlAllowCredentials: true
+    accessControlAllowHeaders:
+      - "Origin"
+      - "Content-Type"
+      - "Accept"
+      - "Authorization"
+      - "X-Requested-With"
+    accessControlMaxAge: 100 

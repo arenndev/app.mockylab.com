@@ -1,13 +1,27 @@
 import axios from 'axios';
 import { authService } from '@/services/authService';
 
-export const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'}/api`;
+export const API_URL = process.env.NEXT_PUBLIC_API_URL 
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+  : 'https://api.mockylab.com/api';
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
 
 // Create axios instance with default config
 export const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 30000,
+  withCredentials: true, // CORS with credentials
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
+
+// CORS hata ayıklama için interceptor ekleyelim
+apiClient.interceptors.request.use(request => {
+  console.log('Starting Request', request)
+  return request
 });
 
 // Request interceptor for adding auth token
@@ -26,8 +40,12 @@ apiClient.interceptors.request.use(
 
 // Response interceptor for handling errors
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  response => {
+    console.log('Response:', response)
+    return response
+  },
+  error => {
+    console.log('Response Error:', error)
     if (error.response?.status === 401) {
       // Token expired or invalid
       authService.logout();
