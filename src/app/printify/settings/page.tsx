@@ -63,6 +63,7 @@ const PrintifySettingsPage = () => {
   const syncShopId = async () => {
     setIsLoading(true);
     try {
+      await printifyService.syncShopId();
       const settings = await printifyService.getSettings();
       if (settings.shopId) {
         setShopId(settings.shopId);

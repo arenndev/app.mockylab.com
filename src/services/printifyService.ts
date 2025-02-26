@@ -129,11 +129,15 @@ class PrintifyService {
 
   async updateApiKey(apiKey: string): Promise<void> {
     try {
-      // JSON formatında gönder
       const response = await axios.post(
-        `${API_URL}${ENDPOINTS.settings.updateApiKey}`,
+        `${API_URL}/api/User/printify-api-key`,
         { printifyApiKey: apiKey },
-        { headers: { 'Content-Type': 'application/json' } }
+        { 
+          headers: {
+            ...this.getHeaders(),
+            'Content-Type': 'application/json'
+          }
+        }
       );
 
       if (!response.data.success) {
@@ -141,7 +145,25 @@ class PrintifyService {
       }
     } catch (error) {
       console.error('Error updating Printify API key:', error);
-      throw error;
+      throw this.handleError(error);
+    }
+  }
+
+  // Shop ID sync için mevcut endpoint'i kullanalım
+  async syncShopId(): Promise<void> {
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/User/shop-id`,
+        {},
+        { headers: this.getHeaders() }
+      );
+
+      if (!response.data.shopId) {
+        throw new Error('Failed to sync shop ID');
+      }
+    } catch (error) {
+      console.error('Error syncing shop ID:', error);
+      throw this.handleError(error);
     }
   }
 
