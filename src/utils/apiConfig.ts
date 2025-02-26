@@ -10,7 +10,7 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mock
 // Create axios instance with default config
 export const apiClient = axios.create({
   baseURL: API_URL,
-  timeout: 30000,
+  timeout: 120000,
   withCredentials: true, // CORS with credentials
   headers: {
     'Content-Type': 'application/json',
@@ -20,8 +20,16 @@ export const apiClient = axios.create({
 
 // CORS hata ayıklama için interceptor ekleyelim
 apiClient.interceptors.request.use(request => {
-  console.log('Starting Request', request)
-  return request
+  console.log('Starting Request', {
+    url: request.url,
+    method: request.method,
+    headers: request.headers,
+    data: request.data instanceof FormData ? 'FormData' : request.data
+  });
+  return request;
+}, error => {
+  console.error('Request Error:', error);
+  return Promise.reject(error);
 });
 
 // Request interceptor for adding auth token
@@ -39,22 +47,28 @@ apiClient.interceptors.request.use(
 );
 
 // Response interceptor for handling errors
-apiClient.interceptors.response.use(
-  response => {
-    console.log('Response:', response)
-    return response
-  },
-  error => {
-    console.log('Response Error:', error)
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      authService.logout();
-      window.location.href = '/login';
-      return Promise.reject(new Error('Authentication failed. Please login again.'));
-    }
-    return Promise.reject(error);
+apiClient.interceptors.response.use(response => {
+  console.log('Response:', {
+    status: response.status,
+    headers: response.headers,
+    data: response.data instanceof Blob ? 'Blob' : response.data
+  });
+  return response;
+}, error => {
+  console.error('Response Error:', {
+    status: error.response?.status,
+    statusText: error.response?.statusText,
+    headers: error.response?.headers,
+    data: error.response?.data
+  });
+  if (error.response?.status === 401) {
+    // Token expired or invalid
+    authService.logout();
+    window.location.href = '/login';
+    return Promise.reject(new Error('Authentication failed. Please login again.'));
   }
-);
+  return Promise.reject(error);
+});
 
 // Auth endpoints
 export const AUTH_ENDPOINTS = {
