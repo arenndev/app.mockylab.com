@@ -757,22 +757,10 @@ const EditMockupPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Eğer area değişiklikleri varsa, önce onları kaydet
-    if (hasUnsavedAreaChanges) {
-      await handleSaveAreas();
-    }
-
     try {
-      if (!mockupId) {
-        throw new Error('Mockup ID is required');
-      }
-
-      setIsLoading(true);
-      const token = authService.getToken();
-      if (!token) {
-        router.push('/login');
-        return;
+      const userId = authService.getCurrentUser()?.userId;
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
       const formDataToSend = new FormData();
@@ -782,9 +770,17 @@ const EditMockupPage = () => {
       formDataToSend.append('DesignColor', formData.designColor.toString());
       formDataToSend.append('TshirtCategory', formData.tshirtCategory);
       formDataToSend.append('SizeCategory', formData.sizeCategory);
+      formDataToSend.append('UserId', userId);
 
       if (formData.imageFile) {
         formDataToSend.append('ImageFile', formData.imageFile);
+      }
+
+      setIsLoading(true);
+      const token = authService.getToken();
+      if (!token) {
+        router.push('/login');
+        return;
       }
 
       const response = await fetch(`${API_URL}/Mockup/${mockupId}`, {

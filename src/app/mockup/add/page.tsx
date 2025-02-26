@@ -403,14 +403,22 @@ const AddMockupPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canvas || !formData.imageFile) return;
-
-    setIsLoading(true);
     try {
-      // Form validation
+      setIsLoading(true);
+
       if (!validateForm()) {
-        setIsLoading(false);
         return;
+      }
+
+      const token = authService.getToken();
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const userId = authService.getCurrentUser()?.userId;
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
       // Get background image
@@ -467,13 +475,6 @@ const AddMockupPage = () => {
           };
         });
 
-      // Get token and check authentication
-      const token = authService.getToken();
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
       // Create form data
       const formDataToSend = new FormData();
       formDataToSend.append('Name', formData.name);
@@ -483,6 +484,7 @@ const AddMockupPage = () => {
       formDataToSend.append('GenderCategory', formData.genderCategory);
       formDataToSend.append('DesignColor', formData.designColor);
       formDataToSend.append('ImageFile', formData.imageFile);
+      formDataToSend.append('UserId', userId);
 
       // First create the mockup
       const mockupResponse = await apiClient.post('/Mockup', formDataToSend);

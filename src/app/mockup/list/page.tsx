@@ -63,8 +63,13 @@ const MockupList = () => {
         return;
       }
 
+      const userId = authService.getCurrentUser()?.userId;
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      const response = await axios.get(`${API_URL}/Mockup`);
+      const response = await axios.get(`${API_URL}/Mockup/user/${userId}`);
       
       if (response.data.success) {
         setMockups(response.data.data);
