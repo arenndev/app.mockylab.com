@@ -55,9 +55,9 @@ export interface GenerateRequest {
 }
 
 export const generateService = {
-  async getMockups(): Promise<Mockup[]> {
+  async getMockups(userId: string): Promise<Mockup[]> {
     try {
-      const response = await apiClient.get(endpoints.mockup.list);
+      const response = await apiClient.get(`/Mockup/user/${userId}`);
       if (!response.data.success) {
         throw new Error('Failed to fetch mockups');
       }

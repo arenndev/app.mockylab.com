@@ -83,20 +83,20 @@ class FavoriteService {
 
   async getMockups(): Promise<Mockup[]> {
     try {
-      const response = await apiClient.get(endpoints.mockup.list);
-      
-      if (!response.data.success) throw new Error('Failed to fetch mockups');
-      
-      return response.data.data.map((mockup: any) => ({
-        id: mockup.id,
-        name: mockup.name,
-        backgroundImagePreviewPath: mockup.backgroundImagePreviewPath,
-        category: mockup.category,
-        genderCategory: mockup.genderCategory,
-        sizeCategory: mockup.sizeCategory
-      }));
+      const userId = authService.getCurrentUser()?.userId;
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
+      // Kullanıcıya özel mockupları getir
+      const response = await apiClient.get(`/Mockup/user/${userId}`);
+      if (!response.data.success) {
+        throw new Error('Failed to fetch mockups');
+      }
+      return response.data.data;
     } catch (error) {
-      throw new Error(handleApiError(error));
+      console.error('Error fetching mockups:', error);
+      throw error;
     }
   }
 

@@ -55,11 +55,20 @@ const FavoritePage = () => {
 
   const fetchMockups = async () => {
     try {
+      const userId = authService.getCurrentUser()?.userId;
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
+      // Kullanıcıya özel mockupları getir
       const newMockups = await favoriteService.getMockups();
       setMockups(newMockups);
     } catch (error) {
       console.error("Error fetching mockups:", error);
       setError("Failed to load mockups. Please try again.");
+      if (error instanceof Error && error.message === 'No authentication token found') {
+        router.push('/login');
+      }
     }
   };
 

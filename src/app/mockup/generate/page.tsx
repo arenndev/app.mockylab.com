@@ -500,7 +500,13 @@ const GeneratePage = () => {
 
   const fetchMockups = async () => {
     try {
-      const data = await generateService.getMockups();
+      const userId = authService.getCurrentUser()?.userId;
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
+      // Kullanıcıya özel mockupları getir
+      const data = await generateService.getMockups(userId);
       console.log('Fetched mockups:', data);
       console.log('First mockup design color:', data[0]?.designColor);
       setMockups(data);
@@ -518,28 +524,25 @@ const GeneratePage = () => {
       console.log('Favorite Lists Response:', response.data);
       
       if (response.data.success) {
-        // Ensure we have the full mockup data before normalizing
-        if (mockups.length === 0) {
-          await fetchMockups();
-        }
-
+        // Önce kullanıcının mockuplarını al
+        const userMockups = await generateService.getMockups(userId);
+        
         const listsWithMockups = response.data.data.map((list: any) => {
-          const normalizedMockups = list.mockups.map((mockup: any) => {
-            // Find the full mockup data from the API
-            const fullMockup = mockups.find(m => m.id === mockup.id);
-            
-            if (fullMockup) {
-              // Merge the data, prioritizing the API data
-              return {
-                ...mockup,
-                ...fullMockup,
-                // Ensure designAreas are preserved from the favorite list
-                designAreas: mockup.designAreas
-              };
-            }
-            
-            return mockup;
-          });
+          const normalizedMockups = list.mockups
+            .map((mockup: any) => {
+              // Sadece kullanıcının mockupları arasından eşleştir
+              const userMockup = userMockups.find(m => m.id === mockup.id);
+              
+              if (userMockup) {
+                return {
+                  ...mockup,
+                  ...userMockup,
+                  designAreas: mockup.designAreas
+                };
+              }
+              return null;
+            })
+            .filter(Boolean); // null olanları filtrele
 
           return {
             ...list,
