@@ -69,32 +69,31 @@ export const generateService = {
 
   async generateMockups(formData: FormData): Promise<Blob> {
     try {
+      // FormData içeriğini kontrol et
+      console.log('FormData contents before sending:');
+      for (const pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+      }
+
       const response = await apiClient.post(endpoints.mockup.generate, formData, {
         responseType: 'blob',
         timeout: 300000,
         headers: {
           'Accept': '*/*',
-          'Content-Type': 'multipart/form-data'
+          // Content-Type header'ını FormData için kaldırıyoruz
+          // Browser otomatik olarak boundary ile birlikte ekleyecek
         },
+        // CORS için credentials ekle
+        withCredentials: true,
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!);
           console.log('Upload Progress:', percentCompleted);
         }
       });
 
-      // Response türünü kontrol et
-      const contentType = response.headers['content-type'];
-      if (contentType && !contentType.includes('application/zip')) {
-        if (contentType.includes('application/json')) {
-          const reader = new FileReader();
-          reader.readAsText(response.data);
-          const text = await new Promise(resolve => {
-            reader.onload = () => resolve(reader.result);
-          });
-          const error = JSON.parse(text as string);
-          throw new Error(error.message || 'Server error');
-        }
-        throw new Error('Unexpected response type: ' + contentType);
+      // Response kontrolü
+      if (!response.data) {
+        throw new Error('No data received from server');
       }
 
       return response.data;
@@ -102,22 +101,20 @@ export const generateService = {
       console.error('Generate error details:', error);
       
       if (axios.isAxiosError(error)) {
-        if (error.response?.data instanceof Blob) {
-          const reader = new FileReader();
-          reader.readAsText(error.response.data);
-          const text = await new Promise(resolve => {
-            reader.onload = () => resolve(reader.result);
-          });
-          console.error('Error response body:', text);
-          throw new Error(text as string);
+        // Response detaylarını logla
+        console.error('Error response:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          headers: error.response?.headers,
+          data: error.response?.data
+        });
+
+        if (error.response?.status === 502) {
+          throw new Error('Server is temporarily unavailable. Please try again later.');
         }
-        
-        if (error.code === 'ECONNABORTED') {
-          throw new Error('Generation is taking longer than expected. Please try with fewer mockups or smaller images.');
-        }
-        
-        if (error.response?.status === 400) {
-          throw new Error('Invalid request. Please check your design files and try again.');
+
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error('Network error occurred. Please check your connection and try again.');
         }
       }
       throw error;
@@ -133,36 +130,25 @@ export const generateService = {
   prepareFormData(request: GenerateRequest): FormData {
     const formData = new FormData();
     
-    // Debug için request içeriğini kontrol edelim
-    console.log('Preparing FormData with request:', {
-      mockupIds: request.mockupIds,
-      designAreaIds: request.designAreaIds,
-      designColors: request.designColors,
-      designFiles: request.designFiles.map(f => f.name)
-    });
-
-    // mockupIds - array notation'ı kaldırıyoruz
-    request.mockupIds.forEach(id => {
+    // Her bir dosya için ayrı bir key kullan
+    request.mockupIds.forEach((id, index) => {
       formData.append('mockupIds', id.toString());
     });
 
-    // designAreaIds - array notation'ı kaldırıyoruz
-    request.designAreaIds.forEach(id => {
+    request.designAreaIds.forEach((id, index) => {
       formData.append('designAreaIds', id.toString());
     });
 
-    // designColors - array notation'ı kaldırıyoruz
-    request.designColors.forEach(color => {
+    request.designColors.forEach((color, index) => {
       formData.append('designColors', color.toString());
     });
 
-    // designFiles - array notation'ı kaldırıyoruz
-    request.designFiles.forEach(file => {
+    request.designFiles.forEach((file, index) => {
       formData.append('designFiles', file);
     });
 
-    // Debug için oluşturulan FormData'yı kontrol edelim
-    console.log('FormData entries:');
+    // Debug için FormData içeriğini kontrol et
+    console.log('FormData contents:');
     for (const pair of formData.entries()) {
       console.log(pair[0], pair[1]);
     }

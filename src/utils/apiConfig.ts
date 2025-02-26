@@ -11,11 +11,19 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mock
 export const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 120000,
-  withCredentials: true, // CORS with credentials
+  withCredentials: true,
   headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': '*/*'
   }
+});
+
+// FormData gönderirken Content-Type header'ını otomatik ayarla
+apiClient.interceptors.request.use(config => {
+  if (config.data instanceof FormData) {
+    // FormData için Content-Type'ı browser otomatik ayarlasın
+    delete config.headers['Content-Type'];
+  }
+  return config;
 });
 
 // CORS hata ayıklama için interceptor ekleyelim
