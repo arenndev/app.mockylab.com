@@ -129,13 +129,19 @@ class PrintifyService {
 
   async updateApiKey(apiKey: string): Promise<void> {
     try {
-      await axios.post(
+      // JSON formatında gönder
+      const response = await axios.post(
         `${API_URL}${ENDPOINTS.settings.updateApiKey}`,
-        { apiKey },
-        { headers: this.getHeaders() }
+        { printifyApiKey: apiKey },
+        { headers: { 'Content-Type': 'application/json' } }
       );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to update API key');
+      }
     } catch (error) {
-      throw this.handleError(error);
+      console.error('Error updating Printify API key:', error);
+      throw error;
     }
   }
 
