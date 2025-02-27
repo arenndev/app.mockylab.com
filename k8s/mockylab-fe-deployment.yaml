@@ -6,7 +6,7 @@ metadata:
   labels:
     app: mockylab-fe
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: mockylab-fe
@@ -35,24 +35,33 @@ spec:
           httpGet:
             path: /api/health
             port: 3000
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 5
         livenessProbe:
           httpGet:
             path: /api/health
             port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 2
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          timeoutSeconds: 10
           successThreshold: 1
-          failureThreshold: 3
+          failureThreshold: 5
         resources:
           limits:
-            cpu: "400m"
-            memory: "512Mi"
+            cpu: "1000m"
+            memory: "1Gi"
           requests:
-            cpu: "200m"
-            memory: "256Mi"
+            cpu: "500m"
+            memory: "512Mi"
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          failureThreshold: 30
+          periodSeconds: 10
       imagePullSecrets:
       - name: dockerhub-secret
       nodeSelector:

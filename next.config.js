@@ -7,21 +7,17 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true
   },
+  experimental: {
+    serverActions: true
+  },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'
   },
   async rewrites() {
-    if (process.env.NODE_ENV === 'development') {
-      return [
-        {
-          source: '/api/:path*',
-          destination: 'https://api.mockylab.com/api/:path*',
-        },
-      ];
-    }
-    return [];
+    return []
   },
   images: {
+    domains: ['images.printify.com'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -32,23 +28,8 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'd3l4q0oig1v782.cloudfront.net',
         pathname: '/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '5002',
-        pathname: '/api/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'ideogram.ai',
-        pathname: '/api/images/**',
       }
-    ],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    formats: ['image/webp'],
-    domains: ['images.printify.com'],
+    ]
   },
   async headers() {
     if (process.env.NODE_ENV === 'development') {
