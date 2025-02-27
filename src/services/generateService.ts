@@ -54,6 +54,29 @@ export interface GenerateRequest {
   designFiles: File[];
 }
 
+interface RawDesignArea {
+  id: string | number;
+  width: string | number;
+  height: string | number;
+  angle: string | number;
+  centerX: string | number;
+  centerY: string | number;
+  name: string;
+}
+
+const stringToDesignColor = (colorString: string): DesignColor => {
+  switch (colorString.toLowerCase()) {
+    case 'black':
+      return DesignColor.Black;
+    case 'white':
+      return DesignColor.White;
+    case 'color':
+      return DesignColor.Color;
+    default:
+      return DesignColor.Color;
+  }
+};
+
 export const generateService = {
   async getMockups(userId: string): Promise<Mockup[]> {
     try {
@@ -61,7 +84,32 @@ export const generateService = {
       if (!response.data.success) {
         throw new Error('Failed to fetch mockups');
       }
-      return response.data.data;
+
+      // Veri yapısını doğrula ve dönüştür
+      const mockups = response.data.data;
+      if (!Array.isArray(mockups)) {
+        throw new Error('Invalid mockup data structure');
+      }
+
+      return mockups.map(mockup => ({
+        ...mockup,
+        designColor: typeof mockup.designColor === 'string' 
+          ? stringToDesignColor(mockup.designColor)
+          : typeof mockup.designColor === 'number'
+            ? mockup.designColor
+            : DesignColor.Color,
+        designAreas: Array.isArray(mockup.designAreas) 
+          ? mockup.designAreas.map((area: RawDesignArea) => ({
+              ...area,
+              id: Number(area.id),
+              width: Number(area.width),
+              height: Number(area.height),
+              angle: Number(area.angle),
+              centerX: Number(area.centerX),
+              centerY: Number(area.centerY)
+            }))
+          : []
+      }));
     } catch (error) {
       throw new Error(handleApiError(error));
     }

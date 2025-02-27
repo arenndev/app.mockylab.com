@@ -502,17 +502,40 @@ const GeneratePage = () => {
     try {
       const userId = authService.getCurrentUser()?.userId;
       if (!userId) {
-        throw new Error('User ID not found');
+        router.push('/login');
+        return;
       }
 
       // Kullanıcıya özel mockupları getir
-      const data = await generateService.getMockups(userId);
-      console.log('Fetched mockups:', data);
-      console.log('First mockup design color:', data[0]?.designColor);
-      setMockups(data);
+      const response = await generateService.getMockups(userId);
+      if (!response || !Array.isArray(response)) {
+        throw new Error('Invalid mockup data received');
+      }
+
+      // DesignColor değerlerini doğru şekilde dönüştür
+      const processedMockups = response.map(mockup => ({
+        ...mockup,
+        designColor: typeof mockup.designColor === 'number' ? mockup.designColor : DesignColor.Color,
+        designAreas: Array.isArray(mockup.designAreas) ? mockup.designAreas.map(area => ({
+          ...area,
+          id: Number(area.id),
+          width: Number(area.width),
+          height: Number(area.height)
+        })) : []
+      }));
+
+      console.log('Processed mockups:', processedMockups);
+      setMockups(processedMockups);
     } catch (error) {
+      console.error('Fetch mockups error:', error);
       if (error instanceof Error) {
-        toast.error(error.message);
+        if (error.message.includes('User ID not found')) {
+          router.push('/login');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.error('Failed to load mockups');
       }
     }
   };
@@ -534,10 +557,18 @@ const GeneratePage = () => {
               const userMockup = userMockups.find(m => m.id === mockup.id);
               
               if (userMockup) {
+                // DesignColor ve diğer özellikleri doğru şekilde birleştir
                 return {
                   ...mockup,
-                  ...userMockup,
-                  designAreas: mockup.designAreas
+                  designColor: userMockup.designColor,
+                  designAreas: Array.isArray(userMockup.designAreas) 
+                    ? userMockup.designAreas.map(area => ({
+                        ...area,
+                        id: Number(area.id),
+                        width: Number(area.width),
+                        height: Number(area.height)
+                      }))
+                    : []
                 };
               }
               return null;
@@ -550,6 +581,7 @@ const GeneratePage = () => {
           };
         });
         
+        console.log('Lists with processed mockups:', listsWithMockups);
         setLists(listsWithMockups);
       }
     } catch (error) {
