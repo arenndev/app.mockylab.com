@@ -1,15 +1,13 @@
 import axios from 'axios';
 import { authService } from '@/services/authService';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
+export const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'}/api`;
 
 console.log('Environment Config:', {
   API_URL,
   NODE_ENV: process.env.NODE_ENV,
   BASE_URL: process.env.NEXT_PUBLIC_BASE_URL
 });
-
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
 
 // Create axios instance with default config
 export const apiClient = axios.create({
