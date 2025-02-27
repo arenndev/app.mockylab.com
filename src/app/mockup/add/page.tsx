@@ -271,7 +271,11 @@ const AddMockupPage = () => {
   useEffect(() => {
     if (!canvas) return;
 
-    createNewDesignArea('Default Area', canvas);
+    // Default area'yı sadece canvas ilk oluşturulduğunda ekle
+    const existingAreas = canvas.getObjects().filter(obj => obj instanceof fabric.Group);
+    if (existingAreas.length === 0) {
+      createNewDesignArea('Default Area', canvas);
+    }
   }, [canvas]);
 
   const validateForm = (): boolean => {
@@ -294,9 +298,29 @@ const AddMockupPage = () => {
   };
 
   const createNewDesignArea = (areaName: string, targetCanvas: fabric.Canvas) => {
+    // Get background image if exists
+    const backgroundImage = targetCanvas.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
+    
+    // Calculate dimensions
+    let areaWidth = 100;
+    let areaHeight = 100;
+    
+    // If background image exists, calculate relative dimensions
+    if (backgroundImage) {
+      const imgWidth = backgroundImage.width! * (backgroundImage.scaleX || 1);
+      const imgHeight = backgroundImage.height! * (backgroundImage.scaleY || 1);
+      
+      areaWidth = Math.round(imgWidth * 0.2); // 20% of image width
+      areaHeight = Math.round(imgHeight * 0.2); // 20% of image height
+      
+      // Minimum size kontrolü
+      areaWidth = Math.max(areaWidth, 100);
+      areaHeight = Math.max(areaHeight, 100);
+    }
+
     const rect = new fabric.Rect({
-      width: 100,
-      height: 100,
+      width: areaWidth,
+      height: areaHeight,
       fill: 'rgba(0,0,0,0.5)',
       strokeWidth: 0,
       originX: 'center',
@@ -381,8 +405,32 @@ const AddMockupPage = () => {
             // Add image first (at the back)
             canvas.add(fabricImage);
             
-            // Re-add all groups (on top)
+            // Resize and re-add all existing design areas
             groups.forEach(group => {
+              const rect = group.getObjects().find((obj): obj is DesignRect => 
+                obj instanceof fabric.Rect
+              ) as DesignRect;
+              
+              // Calculate new dimensions based on image size
+              const imgWidth = fabricImage.width! * scale;
+              const imgHeight = fabricImage.height! * scale;
+              const newWidth = Math.round(imgWidth * 0.2); // 20% of image width
+              const newHeight = Math.round(imgHeight * 0.2); // 20% of image height
+              
+              // Update rectangle dimensions
+              rect.set({
+                width: Math.max(newWidth, 100),
+                height: Math.max(newHeight, 100),
+                scaleX: 1,
+                scaleY: 1
+              });
+              
+              // Update group position if needed
+              group.set({
+                left: Math.min(group.left!, canvas.width! - newWidth/2),
+                top: Math.min(group.top!, canvas.height! - newHeight/2)
+              });
+              
               canvas.add(group);
             });
             
@@ -433,10 +481,15 @@ const AddMockupPage = () => {
           const relativeX = (group.left! - imageLeft);
           const relativeY = (group.top! - imageTop);
 
+          // Group'un scale değerlerini al
+          const groupScaleX = group.scaleX || 1;
+          const groupScaleY = group.scaleY || 1;
+
           const area = {
             name: rect.designAreaName || 'Unnamed Area',
-            width: Math.round(rect.getScaledWidth() / imageScale),
-            height: Math.round(rect.getScaledHeight() / imageScale),
+            // Rect'in gerçek boyutlarını hesapla (scale faktörünü dahil et)
+            width: Math.round((rect.width! * groupScaleX) / imageScale),
+            height: Math.round((rect.height! * groupScaleY) / imageScale),
             angle: Math.round(group.angle || 0),
             centerX: Math.round(relativeX / imageScale),
             centerY: Math.round(relativeY / imageScale)
