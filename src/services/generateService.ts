@@ -115,7 +115,7 @@ export const generateService = {
     }
   },
 
-  async generateMockups(formData: FormData): Promise<Blob> {
+  async generateMockups(formData: FormData, onProgress?: (progress: number) => void): Promise<Blob> {
     try {
       // FormData içeriğini kontrol et
       console.log('FormData contents before sending:');
@@ -123,33 +123,63 @@ export const generateService = {
         console.log(pair[0], pair[1]);
       }
 
+      // Progress başlangıcını bildir
+      onProgress?.(0);
+
       const response = await apiClient.post(endpoints.mockup.generate, formData, {
         responseType: 'blob',
         timeout: 300000,
         headers: {
           'Accept': '*/*',
-          // Content-Type header'ını FormData için kaldırıyoruz
-          // Browser otomatik olarak boundary ile birlikte ekleyecek
         },
-        // CORS için credentials ekle
         withCredentials: true,
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!);
-          console.log('Upload Progress:', percentCompleted);
+          if (progressEvent.total) {
+            // Upload progress'i %80'e kadar göster
+            const uploadPercentage = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            const adjustedProgress = Math.min(Math.round(uploadPercentage * 0.8), 80);
+            console.log('Upload Progress (Raw):', uploadPercentage);
+            console.log('Adjusted Progress:', adjustedProgress);
+            
+            if (onProgress) {
+              window.requestAnimationFrame(() => {
+                onProgress(adjustedProgress);
+              });
+            }
+          }
+        },
+        onDownloadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            // Response progress'i %80-100 arası göster
+            const downloadPercentage = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            const adjustedProgress = Math.min(80 + Math.round(downloadPercentage * 0.2), 100);
+            console.log('Download Progress (Raw):', downloadPercentage);
+            console.log('Adjusted Progress:', adjustedProgress);
+            
+            if (onProgress) {
+              window.requestAnimationFrame(() => {
+                onProgress(adjustedProgress);
+              });
+            }
+          }
         }
       });
 
-      // Response kontrolü
+      // Progress tamamlandı
+      onProgress?.(100);
+
       if (!response.data) {
         throw new Error('No data received from server');
       }
 
       return response.data;
     } catch (error) {
+      // Hata durumunda progress'i sıfırla
+      onProgress?.(0);
+      
       console.error('Generate error details:', error);
       
       if (axios.isAxiosError(error)) {
-        // Response detaylarını logla
         console.error('Error response:', {
           status: error.response?.status,
           statusText: error.response?.statusText,

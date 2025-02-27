@@ -460,6 +460,7 @@ const GeneratePage = () => {
   const [selectedMockups, setSelectedMockups] = useState<Mockup[]>([]);
   const [isQuickSelectOpen, setIsQuickSelectOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const designFileUpload = useFileUpload({
     maxSizeInMB: 10,
@@ -661,10 +662,13 @@ const GeneratePage = () => {
       }
 
       setIsGenerating(true);
+      setUploadProgress(0);
       const formData = generateService.prepareFormData(request);
       console.log('FormData prepared:', formData);
       
-      const blob = await generateService.generateMockups(formData);
+      const blob = await generateService.generateMockups(formData, (progress) => {
+        setUploadProgress(progress);
+      });
       console.log('Response received:', blob);
       
       generateService.downloadGeneratedFile(blob);
@@ -678,6 +682,7 @@ const GeneratePage = () => {
       }
     } finally {
       setIsGenerating(false);
+      setUploadProgress(0);
     }
   };
 
@@ -862,22 +867,43 @@ const GeneratePage = () => {
                 ))}
               </div>
 
-              {/* Generate Button */}
-              <button
-                onClick={() => {
-                  console.log('Generate button clicked');
-                  handleGenerate();
-                }}
-                disabled={isGenerating}
-                className="mt-6 flex w-full justify-center rounded-lg bg-primary p-4 font-medium text-gray hover:bg-opacity-90 disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : 'Generate Mockups'}
-              </button>
+              {/* Generate Button with Progress Bar */}
+              <div className="mt-6 space-y-3">
+                {/* Progress Bar */}
+                <div className="w-full bg-stroke dark:bg-strokedark rounded-full h-3 overflow-hidden">
+                  <div 
+                    className={`h-full bg-primary transition-all duration-300 ease-in-out rounded-full ${isGenerating ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+
+                {/* Generate Button */}
+                <button
+                  onClick={() => {
+                    console.log('Generate button clicked');
+                    console.log('Current progress:', uploadProgress);
+                    handleGenerate();
+                  }}
+                  disabled={isGenerating}
+                  className={`flex w-full justify-center rounded-lg p-4 font-medium text-gray transition-all duration-300 ${
+                    isGenerating 
+                      ? 'bg-primary/80 cursor-not-allowed' 
+                      : 'bg-primary hover:bg-opacity-90'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {isGenerating && (
+                      <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    )}
+                    <span className="text-white font-semibold">
+                      {isGenerating ? `Generating... ${uploadProgress}%` : 'Generate Mockups'}
+                    </span>
+                  </div>
+                </button>
+              </div>
             </>
           )}
         </div>
