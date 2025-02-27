@@ -1,9 +1,13 @@
 import axios from 'axios';
 import { authService } from '@/services/authService';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL 
-  ? `${process.env.NEXT_PUBLIC_API_URL}/api`
-  : 'https://api.mockylab.com/api';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
+
+console.log('Environment Config:', {
+  API_URL,
+  NODE_ENV: process.env.NODE_ENV,
+  BASE_URL: process.env.NEXT_PUBLIC_BASE_URL
+});
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
 
@@ -26,14 +30,23 @@ apiClient.interceptors.request.use(config => {
   return config;
 });
 
-// CORS hata ayıklama için interceptor ekleyelim
+// API istek interceptor'ını güncelleyelim
 apiClient.interceptors.request.use(request => {
-  console.log('Starting Request', {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  console.log('API Request:', {
     url: request.url,
     method: request.method,
+    baseURL: request.baseURL,
     headers: request.headers,
-    data: request.data instanceof FormData ? 'FormData' : request.data
+    environment: process.env.NODE_ENV,
+    data: request.data instanceof FormData ? 
+      'FormData Contents:' + Array.from(request.data.entries()).map(([key, value]) => 
+        `${key}: ${value instanceof File ? value.name : value}`
+      ).join(', ') 
+      : request.data
   });
+
   return request;
 }, error => {
   console.error('Request Error:', error);
@@ -56,18 +69,18 @@ apiClient.interceptors.request.use(
 
 // Response interceptor for handling errors
 apiClient.interceptors.response.use(response => {
-  console.log('Response:', {
+  console.log('API Response:', {
+    url: response.config.url,
     status: response.status,
-    headers: response.headers,
-    data: response.data instanceof Blob ? 'Blob' : response.data
+    data: response.data
   });
   return response;
 }, error => {
   console.error('Response Error:', {
+    url: error.config?.url,
     status: error.response?.status,
-    statusText: error.response?.statusText,
-    headers: error.response?.headers,
-    data: error.response?.data
+    data: error.response?.data,
+    message: error.message
   });
   if (error.response?.status === 401) {
     // Token expired or invalid

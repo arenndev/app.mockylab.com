@@ -405,34 +405,19 @@ const AddMockupPage = () => {
     e.preventDefault();
     try {
       setIsLoading(true);
+      
+      // Request detaylarını logla
+      console.log('Form Data:', {
+        name: formData.name,
+        category: formData.category,
+        tshirtCategory: formData.tshirtCategory,
+        sizeCategory: formData.sizeCategory,
+        genderCategory: formData.genderCategory,
+        designColor: formData.designColor,
+        imageFile: formData.imageFile?.name
+      });
 
-      if (!validateForm()) {
-        return;
-      }
-
-      const token = authService.getToken();
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
-      const userId = authService.getCurrentUser()?.userId;
-      if (!userId) {
-        throw new Error('User ID not found');
-      }
-
-      // Get background image
-      const backgroundImage = canvas.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
-      if (!backgroundImage) {
-        throw new Error('Background image not found');
-      }
-
-      // Calculate image scale
-      const imageScale = backgroundImage.scaleX || 1;
-      const imageLeft = backgroundImage.left || 0;
-      const imageTop = backgroundImage.top || 0;
-
-      // Get design areas from canvas
+      // Design Areas'ı logla
       const designAreas = canvas.getObjects()
         .filter((obj): obj is fabric.Group => obj instanceof fabric.Group)
         .map(group => {
@@ -440,39 +425,25 @@ const AddMockupPage = () => {
             obj instanceof fabric.Rect
           ) as DesignRect;
           
-          // Calculate relative position to image
-          const relativeX = (group.left || 0) - imageLeft;
-          const relativeY = (group.top || 0) - imageTop;
+          const backgroundImage = canvas.getObjects().find(obj => obj instanceof fabric.Image) as fabric.Image;
+          const imageScale = backgroundImage.scaleX || 1;
+          const imageLeft = backgroundImage.left || 0;
+          const imageTop = backgroundImage.top || 0;
 
-          // Convert to original image coordinates
-          const originalX = Math.round(relativeX / imageScale);
-          const originalY = Math.round(relativeY / imageScale);
-          
-          // Get dimensions directly from the rect
-          const originalWidth = Math.round(rect.getScaledWidth() / imageScale);
-          const originalHeight = Math.round(rect.getScaledHeight() / imageScale);
+          const relativeX = (group.left! - imageLeft);
+          const relativeY = (group.top! - imageTop);
 
-          // Log dimensions for debugging
-          console.log('Design Area Dimensions:', {
-            rectOriginalWidth: rect.width,
-            rectOriginalHeight: rect.height,
-            rectScaledWidth: rect.getScaledWidth(),
-            rectScaledHeight: rect.getScaledHeight(),
-            groupScaleX: group.scaleX,
-            groupScaleY: group.scaleY,
-            imageScale,
-            calculatedWidth: originalWidth,
-            calculatedHeight: originalHeight
-          });
-
-          return {
+          const area = {
             name: rect.designAreaName || 'Unnamed Area',
-            width: originalWidth,
-            height: originalHeight,
+            width: Math.round(rect.getScaledWidth() / imageScale),
+            height: Math.round(rect.getScaledHeight() / imageScale),
             angle: Math.round(group.angle || 0),
-            centerX: originalX,
-            centerY: originalY
+            centerX: Math.round(relativeX / imageScale),
+            centerY: Math.round(relativeY / imageScale)
           };
+
+          console.log('Design Area Details:', area);
+          return area;
         });
 
       // Create form data
@@ -484,17 +455,26 @@ const AddMockupPage = () => {
       formDataToSend.append('GenderCategory', formData.genderCategory);
       formDataToSend.append('DesignColor', formData.designColor);
       formDataToSend.append('ImageFile', formData.imageFile);
-      formDataToSend.append('UserId', userId);
+      formDataToSend.append('UserId', authService.getCurrentUser()?.userId);
 
-      // First create the mockup
-      const mockupResponse = await apiClient.post('/Mockup', formDataToSend);
+      // API isteğini logla
+      const mockupResponse = await apiClient.post('/Mockup', formDataToSend, {
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!);
+          console.log('Upload Progress:', percentCompleted + '%');
+        }
+      });
+
+      console.log('Mockup Response:', mockupResponse.data);
 
       if (mockupResponse.data.success) {
         const mockupId = mockupResponse.data.data.id;
 
-        // Add design areas
+        // Design Areas isteklerini logla
         for (const designArea of designAreas) {
-          await apiClient.post(`/mockups/${mockupId}/design-areas`, designArea);
+          console.log('Sending Design Area:', designArea);
+          const areaResponse = await apiClient.post(`/mockups/${mockupId}/design-areas`, designArea);
+          console.log('Design Area Response:', areaResponse.data);
         }
 
         setModalState({
@@ -505,12 +485,13 @@ const AddMockupPage = () => {
         });
       }
     } catch (error: any) {
-      console.error('Error details:', error);
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
-      }
+      console.error('Error details:', {
+        error: error,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
+      
       setModalState({
         isOpen: true,
         message: handleApiError(error),
