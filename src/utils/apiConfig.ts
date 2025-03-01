@@ -69,6 +69,29 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Metrik kayıt fonksiyonu - hem sunucu hem istemci tarafında çalışabilir
+const recordApiMetric = async (method: string, endpoint: string, statusCode: number, duration: number) => {
+  // Sunucu tarafında çalışıyorsa doğrudan kaydet
+  if (typeof window === 'undefined') {
+    try {
+      await metrics.recordApiRequest(method, endpoint, statusCode, duration);
+      console.log(`Recorded API metric: ${method} ${endpoint} ${statusCode} ${duration}s`);
+    } catch (error) {
+      console.error('Error recording API metrics:', error);
+    }
+  } 
+  // İstemci tarafında çalışıyorsa, API çağrısı yap
+  else {
+    try {
+      // İstemci tarafında metrik kaydetmek için bir API endpoint'i kullanabiliriz
+      // Bu örnekte sadece konsola logluyoruz
+      console.log(`Client-side API metric: ${method} ${endpoint} ${statusCode} ${duration}s`);
+    } catch (error) {
+      console.error('Error logging client-side API metrics:', error);
+    }
+  }
+};
+
 // Response interceptor for handling errors
 apiClient.interceptors.response.use(response => {
   console.log('API Response:', {
@@ -80,11 +103,13 @@ apiClient.interceptors.response.use(response => {
   // Başarılı API isteklerini metrik olarak kaydet
   try {
     const startTime = response.config.headers['x-request-start-time'];
-    if (startTime && typeof window === 'undefined') {
+    if (startTime) {
       const duration = (Date.now() - Number(startTime)) / 1000;
       const method = response.config.method?.toUpperCase() || 'UNKNOWN';
       const endpoint = response.config.url || 'unknown';
-      metrics.recordApiRequest(method, endpoint, response.status, duration);
+      
+      // Metrik kayıt fonksiyonunu çağır
+      recordApiMetric(method, endpoint, response.status, duration);
     }
   } catch (error) {
     console.error('API metrics recording error:', error);
@@ -102,12 +127,14 @@ apiClient.interceptors.response.use(response => {
   // Hatalı API isteklerini metrik olarak kaydet
   try {
     const startTime = error.config?.headers?.['x-request-start-time'];
-    if (startTime && typeof window === 'undefined') {
+    if (startTime) {
       const duration = (Date.now() - Number(startTime)) / 1000;
       const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
       const endpoint = error.config?.url || 'unknown';
       const status = error.response?.status || 500;
-      metrics.recordApiRequest(method, endpoint, status, duration);
+      
+      // Metrik kayıt fonksiyonunu çağır
+      recordApiMetric(method, endpoint, status, duration);
     }
   } catch (metricError) {
     console.error('API error metrics recording error:', metricError);
