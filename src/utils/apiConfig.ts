@@ -78,12 +78,16 @@ apiClient.interceptors.response.use(response => {
   });
   
   // Başarılı API isteklerini metrik olarak kaydet
-  const startTime = response.config.headers['x-request-start-time'];
-  if (startTime) {
-    const duration = (Date.now() - Number(startTime)) / 1000;
-    const method = response.config.method?.toUpperCase() || 'UNKNOWN';
-    const endpoint = response.config.url || 'unknown';
-    metrics.recordApiRequest(method, endpoint, response.status, duration);
+  try {
+    const startTime = response.config.headers['x-request-start-time'];
+    if (startTime && typeof metrics.recordApiRequest === 'function') {
+      const duration = (Date.now() - Number(startTime)) / 1000;
+      const method = response.config.method?.toUpperCase() || 'UNKNOWN';
+      const endpoint = response.config.url || 'unknown';
+      metrics.recordApiRequest(method, endpoint, response.status, duration);
+    }
+  } catch (error) {
+    console.error('API metrics recording error:', error);
   }
   
   return response;
@@ -96,13 +100,17 @@ apiClient.interceptors.response.use(response => {
   });
   
   // Hatalı API isteklerini metrik olarak kaydet
-  const startTime = error.config?.headers?.['x-request-start-time'];
-  if (startTime) {
-    const duration = (Date.now() - Number(startTime)) / 1000;
-    const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
-    const endpoint = error.config?.url || 'unknown';
-    const status = error.response?.status || 500;
-    metrics.recordApiRequest(method, endpoint, status, duration);
+  try {
+    const startTime = error.config?.headers?.['x-request-start-time'];
+    if (startTime && typeof metrics.recordApiRequest === 'function') {
+      const duration = (Date.now() - Number(startTime)) / 1000;
+      const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
+      const endpoint = error.config?.url || 'unknown';
+      const status = error.response?.status || 500;
+      metrics.recordApiRequest(method, endpoint, status, duration);
+    }
+  } catch (metricError) {
+    console.error('API error metrics recording error:', metricError);
   }
   
   if (error.response?.status === 401) {

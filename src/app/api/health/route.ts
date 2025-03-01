@@ -1,26 +1,38 @@
 import { NextResponse } from 'next/server'
 import metrics from '@/utils/metrics'
-import client from 'prom-client'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Sağlık kontrolü sayacı
-const healthCheckCounter = new client.Counter({
-  name: 'health_check_total',
-  help: 'Toplam sağlık kontrolü sayısı',
-  labelNames: ['status'],
-  registers: [metrics.register],
-});
+// Sağlık kontrolü sayacı ve süresi için değişkenler
+let healthCheckCounter: any;
+let healthCheckDuration: any;
 
-// Sağlık kontrolü süresi
-const healthCheckDuration = new client.Histogram({
-  name: 'health_check_duration_seconds',
-  help: 'Sağlık kontrolü süresi (saniye)',
-  labelNames: ['status'],
-  buckets: [0.01, 0.05, 0.1, 0.5, 1],
-  registers: [metrics.register],
-});
+// Sunucu tarafında çalıştığından emin olun
+if (typeof window === 'undefined') {
+  try {
+    const client = require('prom-client');
+    
+    // Sağlık kontrolü sayacı
+    healthCheckCounter = new client.Counter({
+      name: 'health_check_total',
+      help: 'Toplam sağlık kontrolü sayısı',
+      labelNames: ['status'],
+      registers: [metrics.register],
+    });
+    
+    // Sağlık kontrolü süresi
+    healthCheckDuration = new client.Histogram({
+      name: 'health_check_duration_seconds',
+      help: 'Sağlık kontrolü süresi (saniye)',
+      labelNames: ['status'],
+      buckets: [0.01, 0.05, 0.1, 0.5, 1],
+      registers: [metrics.register],
+    });
+  } catch (error) {
+    console.error('Health metrics initialization error:', error);
+  }
+}
 
 export async function GET() {
   const startTime = Date.now();
@@ -31,9 +43,11 @@ export async function GET() {
     const uptime = process.uptime();
     
     // Başarılı sağlık kontrolünü kaydet
-    healthCheckCounter.inc({ status: 'success' });
-    const duration = (Date.now() - startTime) / 1000;
-    healthCheckDuration.observe({ status: 'success' }, duration);
+    if (healthCheckCounter) {
+      healthCheckCounter.inc({ status: 'success' });
+      const duration = (Date.now() - startTime) / 1000;
+      healthCheckDuration.observe({ status: 'success' }, duration);
+    }
     
     return NextResponse.json(
       { 
@@ -62,9 +76,11 @@ export async function GET() {
     console.error('Health check error:', error)
     
     // Başarısız sağlık kontrolünü kaydet
-    healthCheckCounter.inc({ status: 'error' });
-    const duration = (Date.now() - startTime) / 1000;
-    healthCheckDuration.observe({ status: 'error' }, duration);
+    if (healthCheckCounter) {
+      healthCheckCounter.inc({ status: 'error' });
+      const duration = (Date.now() - startTime) / 1000;
+      healthCheckDuration.observe({ status: 'error' }, duration);
+    }
     
     return NextResponse.json(
       { status: 'error', message: 'Health check failed' },

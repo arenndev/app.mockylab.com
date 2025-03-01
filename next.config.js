@@ -13,6 +13,27 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'
   },
+  webpack: (config, { isServer }) => {
+    // Sunucu tarafında çalışıyorsa, Node.js modüllerini kullan
+    if (isServer) {
+      return config;
+    }
+
+    // İstemci tarafında çalışıyorsa, Node.js modüllerini polyfill et
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      cluster: false,
+      v8: false,
+      os: false,
+      path: false,
+      child_process: false,
+      perf_hooks: false,
+      // Diğer gerekli modüller için de false ekleyebilirsiniz
+    };
+
+    return config;
+  },
   async rewrites() {
     return []
   },
