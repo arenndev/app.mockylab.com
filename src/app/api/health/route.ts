@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import metrics from '@/utils/metrics'
+import * as metrics from '@/utils/metrics'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -13,21 +13,28 @@ if (typeof window === 'undefined') {
   try {
     const client = require('prom-client');
     
-    // Sağlık kontrolü sayacı
-    healthCheckCounter = new client.Counter({
-      name: 'health_check_total',
-      help: 'Toplam sağlık kontrolü sayısı',
-      labelNames: ['status'],
-      registers: [metrics.register],
-    });
-    
-    // Sağlık kontrolü süresi
-    healthCheckDuration = new client.Histogram({
-      name: 'health_check_duration_seconds',
-      help: 'Sağlık kontrolü süresi (saniye)',
-      labelNames: ['status'],
-      buckets: [0.01, 0.05, 0.1, 0.5, 1],
-      registers: [metrics.register],
+    // Registry'yi metrics modülünden al
+    metrics.getRegistry().then(register => {
+      if (register) {
+        // Sağlık kontrolü sayacı
+        healthCheckCounter = new client.Counter({
+          name: 'health_check_total',
+          help: 'Toplam sağlık kontrolü sayısı',
+          labelNames: ['status'],
+          registers: [register],
+        });
+        
+        // Sağlık kontrolü süresi
+        healthCheckDuration = new client.Histogram({
+          name: 'health_check_duration_seconds',
+          help: 'Sağlık kontrolü süresi (saniye)',
+          labelNames: ['status'],
+          buckets: [0.01, 0.05, 0.1, 0.5, 1],
+          registers: [register],
+        });
+      }
+    }).catch(error => {
+      console.error('Health metrics registry error:', error);
     });
   } catch (error) {
     console.error('Health metrics initialization error:', error);

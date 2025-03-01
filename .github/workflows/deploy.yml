@@ -66,5 +66,5 @@ jobs:
           kubectl apply -f k8s/mockylab-fe-service.yaml
           kubectl apply -f k8s/headers-middleware.yaml
           kubectl apply -f k8s/mockylab-fe-ingressroute.yaml
-          kubectl apply -f k8s/mockylab-fe-networkpolicy.yaml 
+          kubectl apply -f k8s/mockylab-fe-networkpolicy.yaml
           kubectl apply -f k8s/mockylab-fe-servicemonitor.yaml

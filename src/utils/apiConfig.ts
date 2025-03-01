@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { authService } from '@/services/authService';
-import metrics from './metrics';
+import * as metrics from './metrics';
 
 export const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'}/api`;
 
@@ -80,7 +80,7 @@ apiClient.interceptors.response.use(response => {
   // Başarılı API isteklerini metrik olarak kaydet
   try {
     const startTime = response.config.headers['x-request-start-time'];
-    if (startTime && typeof metrics.recordApiRequest === 'function') {
+    if (startTime && typeof window === 'undefined') {
       const duration = (Date.now() - Number(startTime)) / 1000;
       const method = response.config.method?.toUpperCase() || 'UNKNOWN';
       const endpoint = response.config.url || 'unknown';
@@ -102,7 +102,7 @@ apiClient.interceptors.response.use(response => {
   // Hatalı API isteklerini metrik olarak kaydet
   try {
     const startTime = error.config?.headers?.['x-request-start-time'];
-    if (startTime && typeof metrics.recordApiRequest === 'function') {
+    if (startTime && typeof window === 'undefined') {
       const duration = (Date.now() - Number(startTime)) / 1000;
       const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
       const endpoint = error.config?.url || 'unknown';

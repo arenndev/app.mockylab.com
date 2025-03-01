@@ -1,26 +1,28 @@
 'use server'; // Bu, kodun yalnızca sunucuda çalışacağını belirtir
 
-let metrics: any = {
-  recordHttpRequest: () => {},
-  recordApiRequest: () => {},
-  getMetrics: async () => '',
-  getContentType: () => 'text/plain',
-  register: {},
-};
+import { headers } from 'next/headers';
+
+let client: any;
+let register: any;
+let httpRequestCounter: any;
+let httpRequestDuration: any;
+let apiRequestCounter: any;
+let apiRequestDuration: any;
+let memoryGauge: any;
 
 // Sunucu tarafında çalıştığından emin olun
 if (typeof window === 'undefined') {
   try {
-    const client = require('prom-client');
+    client = require('prom-client');
     
     // Singleton Registry oluştur
-    const register = new client.Registry();
+    register = new client.Registry();
     
     // Varsayılan metrikleri ekle (CPU, bellek kullanımı vb.)
     client.collectDefaultMetrics({ register });
     
     // HTTP istek sayacı
-    const httpRequestCounter = new client.Counter({
+    httpRequestCounter = new client.Counter({
       name: 'http_requests_total',
       help: 'Toplam HTTP istek sayısı',
       labelNames: ['method', 'route', 'status_code'],
@@ -28,7 +30,7 @@ if (typeof window === 'undefined') {
     });
     
     // HTTP istek süresi
-    const httpRequestDuration = new client.Histogram({
+    httpRequestDuration = new client.Histogram({
       name: 'http_request_duration_seconds',
       help: 'HTTP istek süresi (saniye)',
       labelNames: ['method', 'route', 'status_code'],
@@ -37,7 +39,7 @@ if (typeof window === 'undefined') {
     });
     
     // API istek sayacı
-    const apiRequestCounter = new client.Counter({
+    apiRequestCounter = new client.Counter({
       name: 'api_requests_total',
       help: 'Toplam API istek sayısı',
       labelNames: ['method', 'endpoint', 'status_code'],
@@ -45,7 +47,7 @@ if (typeof window === 'undefined') {
     });
     
     // API istek süresi
-    const apiRequestDuration = new client.Histogram({
+    apiRequestDuration = new client.Histogram({
       name: 'api_request_duration_seconds',
       help: 'API istek süresi (saniye)',
       labelNames: ['method', 'endpoint', 'status_code'],
@@ -54,7 +56,7 @@ if (typeof window === 'undefined') {
     });
     
     // Bellek kullanımı
-    const memoryGauge = new client.Gauge({
+    memoryGauge = new client.Gauge({
       name: 'nodejs_memory_usage_bytes',
       help: 'Node.js bellek kullanımı (byte)',
       labelNames: ['type'],
@@ -67,37 +69,60 @@ if (typeof window === 'undefined') {
         this.set({ type: 'external' }, memoryUsage.external);
       },
     });
-    
-    // Metrik yardımcıları
-    metrics = {
-      // HTTP istekleri için metrikler
-      recordHttpRequest: (method: string, route: string, statusCode: number, duration: number) => {
-        httpRequestCounter.inc({ method, route, status_code: statusCode });
-        httpRequestDuration.observe({ method, route, status_code: statusCode }, duration);
-      },
-    
-      // API istekleri için metrikler
-      recordApiRequest: (method: string, endpoint: string, statusCode: number, duration: number) => {
-        apiRequestCounter.inc({ method, endpoint, status_code: statusCode });
-        apiRequestDuration.observe({ method, endpoint, status_code: statusCode }, duration);
-      },
-    
-      // Prometheus için metrik çıktısı
-      getMetrics: async () => {
-        return register.metrics();
-      },
-    
-      // Content type
-      getContentType: () => {
-        return register.contentType;
-      },
-    
-      // Registry
-      register,
-    };
   } catch (error) {
     console.error('Metrics initialization error:', error);
   }
 }
 
-export default metrics; 
+// HTTP istekleri için metrikler
+export async function recordHttpRequest(method: string, route: string, statusCode: number, duration: number) {
+  if (typeof window === 'undefined' && httpRequestCounter && httpRequestDuration) {
+    try {
+      httpRequestCounter.inc({ method, route, status_code: statusCode });
+      httpRequestDuration.observe({ method, route, status_code: statusCode }, duration);
+    } catch (error) {
+      console.error('Error recording HTTP request metrics:', error);
+    }
+  }
+}
+
+// API istekleri için metrikler
+export async function recordApiRequest(method: string, endpoint: string, statusCode: number, duration: number) {
+  if (typeof window === 'undefined' && apiRequestCounter && apiRequestDuration) {
+    try {
+      apiRequestCounter.inc({ method, endpoint, status_code: statusCode });
+      apiRequestDuration.observe({ method, endpoint, status_code: statusCode }, duration);
+    } catch (error) {
+      console.error('Error recording API request metrics:', error);
+    }
+  }
+}
+
+// Prometheus için metrik çıktısı
+export async function getMetrics() {
+  if (typeof window === 'undefined' && register) {
+    try {
+      return await register.metrics();
+    } catch (error) {
+      console.error('Error getting metrics:', error);
+      return '';
+    }
+  }
+  return '';
+}
+
+// Content type
+export async function getContentType() {
+  if (typeof window === 'undefined' && register) {
+    return register.contentType;
+  }
+  return 'text/plain';
+}
+
+// Registry'ye erişim için yardımcı fonksiyon
+export async function getRegistry() {
+  if (typeof window === 'undefined') {
+    return register;
+  }
+  return null;
+} 
