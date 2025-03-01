@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { authService } from '@/services/authService';
+import metrics from './metrics';
 
 export const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'}/api`;
 
@@ -51,9 +52,12 @@ apiClient.interceptors.request.use(request => {
   return Promise.reject(error);
 });
 
-// Request interceptor for adding auth token
+// Request interceptor for adding auth token and start time for metrics
 apiClient.interceptors.request.use(
   (config) => {
+    // İstek başlangıç zamanını kaydet
+    config.headers['x-request-start-time'] = Date.now().toString();
+    
     const token = authService.getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -72,6 +76,16 @@ apiClient.interceptors.response.use(response => {
     status: response.status,
     data: response.data
   });
+  
+  // Başarılı API isteklerini metrik olarak kaydet
+  const startTime = response.config.headers['x-request-start-time'];
+  if (startTime) {
+    const duration = (Date.now() - Number(startTime)) / 1000;
+    const method = response.config.method?.toUpperCase() || 'UNKNOWN';
+    const endpoint = response.config.url || 'unknown';
+    metrics.recordApiRequest(method, endpoint, response.status, duration);
+  }
+  
   return response;
 }, error => {
   console.error('Response Error:', {
@@ -80,6 +94,17 @@ apiClient.interceptors.response.use(response => {
     data: error.response?.data,
     message: error.message
   });
+  
+  // Hatalı API isteklerini metrik olarak kaydet
+  const startTime = error.config?.headers?.['x-request-start-time'];
+  if (startTime) {
+    const duration = (Date.now() - Number(startTime)) / 1000;
+    const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
+    const endpoint = error.config?.url || 'unknown';
+    const status = error.response?.status || 500;
+    metrics.recordApiRequest(method, endpoint, status, duration);
+  }
+  
   if (error.response?.status === 401) {
     // Token expired or invalid
     authService.logout();
