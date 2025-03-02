@@ -11,12 +11,13 @@ interface DecodedToken {
   sub: string;
   jti: string;
   "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name": string;
-  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier": string;
+  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"?: string;
+  uid?: number;
   "http://schemas.microsoft.com/ws/2008/06/identity/claims/role": string;
   exp: number;
   iss: string;
   aud: string;
-  userId?: string;
+  userId?: number;
   [key: string]: any;
 }
 
@@ -35,8 +36,15 @@ class AuthService {
       if (response.data.token) {
         const decodedToken = jwtDecode<DecodedToken>(response.data.token);
         
-        // Add userId from nameidentifier claim
-        decodedToken.userId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        // Add userId from uid claim (new) or nameidentifier claim (old)
+        if (decodedToken.uid !== undefined) {
+          // Yeni token yapısı
+          decodedToken.userId = decodedToken.uid;
+        } else if (decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]) {
+          // Eski token yapısı - string'den number'a dönüşüm
+          const nameId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+          decodedToken.userId = parseInt(nameId, 10);
+        }
         
         // Store in both localStorage and cookies
         localStorage.setItem(this.tokenKey, response.data.token);
@@ -122,8 +130,16 @@ class AuthService {
       if (!token) return null;
       
       const decodedToken = jwtDecode<DecodedToken>(token);
-      // Add userId from nameidentifier claim
-      decodedToken.userId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+      
+      // Add userId from uid claim (new) or nameidentifier claim (old)
+      if (decodedToken.uid !== undefined) {
+        // Yeni token yapısı
+        decodedToken.userId = decodedToken.uid;
+      } else if (decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]) {
+        // Eski token yapısı - string'den number'a dönüşüm
+        const nameId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        decodedToken.userId = parseInt(nameId, 10);
+      }
       
       return decodedToken;
     } catch {
@@ -131,7 +147,7 @@ class AuthService {
     }
   }
 
-  getUserId(): string | null {
+  getUserId(): number | null {
     const currentUser = this.getCurrentUser();
     return currentUser?.userId || null;
   }
@@ -147,8 +163,16 @@ class AuthService {
 
       if (response.data.token) {
         const decodedToken = jwtDecode<DecodedToken>(response.data.token);
-        // Add userId from nameidentifier claim
-        decodedToken.userId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        
+        // Add userId from uid claim (new) or nameidentifier claim (old)
+        if (decodedToken.uid !== undefined) {
+          // Yeni token yapısı
+          decodedToken.userId = decodedToken.uid;
+        } else if (decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]) {
+          // Eski token yapısı - string'den number'a dönüşüm
+          const nameId = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+          decodedToken.userId = parseInt(nameId, 10);
+        }
         
         // Update both localStorage and cookies
         localStorage.setItem(this.tokenKey, response.data.token);

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { printifyService } from '@/services/printifyService';
 import { authService } from '@/services/authService';
+import { getCurrentUserId } from '@/utils/apiConfig';
 import type { Blueprint, BlueprintVariant } from '@/types/printify';
 
 interface Props {
@@ -30,10 +31,9 @@ const BlueprintSelectModal = ({ isOpen, onClose, onBlueprintSelect }: Props) => 
     const fetchUserBlueprints = async () => {
         setLoading(true);
         try {
-            const userId = authService.getUserId();
-            if (!userId) {
-                throw new Error('User not found');
-            }
+            // getCurrentUserId helper fonksiyonunu kullanarak kullanıcı ID'sini al
+            const userId = getCurrentUserId();
+            
             const response = await printifyService.getUserBlueprints(userId);
             // Her bir userBlueprint'in blueprint özelliğini al
             const blueprintsList = response.map(item => item.blueprint);

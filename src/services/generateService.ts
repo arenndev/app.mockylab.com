@@ -1,4 +1,4 @@
-import { apiClient, endpoints, handleApiError } from '@/utils/apiConfig';
+import { apiClient, endpoints, handleApiError, getCurrentUserId } from '@/utils/apiConfig';
 import { authService } from './authService';
 import axios from 'axios';
 
@@ -44,7 +44,7 @@ export interface Mockup {
   designAreas: DesignArea[];
   createdAt: string;
   updatedAt: string;
-  userId: string | null;
+  userId: number | null;
 }
 
 export interface GenerateRequest {
@@ -78,8 +78,11 @@ const stringToDesignColor = (colorString: string): DesignColor => {
 };
 
 export const generateService = {
-  async getMockups(userId: string): Promise<Mockup[]> {
+  async getMockups(): Promise<Mockup[]> {
     try {
+      // getCurrentUserId helper fonksiyonunu kullanarak kullanıcı ID'sini al
+      const userId = getCurrentUserId();
+      
       const response = await apiClient.get(`/Mockup/user/${userId}`);
       if (!response.data.success) {
         throw new Error('Failed to fetch mockups');
@@ -98,20 +101,13 @@ export const generateService = {
           : typeof mockup.designColor === 'number'
             ? mockup.designColor
             : DesignColor.Color,
-        designAreas: Array.isArray(mockup.designAreas) 
-          ? mockup.designAreas.map((area: RawDesignArea) => ({
-              ...area,
-              id: Number(area.id),
-              width: Number(area.width),
-              height: Number(area.height),
-              angle: Number(area.angle),
-              centerX: Number(area.centerX),
-              centerY: Number(area.centerY)
-            }))
-          : []
+        userId: mockup.userId !== null && typeof mockup.userId === 'string'
+          ? parseInt(mockup.userId, 10)
+          : mockup.userId
       }));
     } catch (error) {
-      throw new Error(handleApiError(error));
+      console.error('Error fetching mockups:', error);
+      throw error;
     }
   },
 

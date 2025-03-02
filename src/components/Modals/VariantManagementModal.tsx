@@ -157,7 +157,7 @@ const VariantManagementModal = ({ isOpen, onClose, blueprintId, variants, onSave
       const createRequests = localUserVariants
         .filter(v => !isRealId(v.id)) // Sadece geçici ID'si olanlar
         .map(variant => ({
-          userId: parseInt(userId),
+          userId,
           blueprintId: parseInt(blueprintId),
           variantId: variant.variantId,
           defaultPrice: variant.defaultPrice,

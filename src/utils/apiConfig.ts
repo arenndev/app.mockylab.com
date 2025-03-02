@@ -2,6 +2,7 @@ import axios from 'axios';
 import { authService } from '@/services/authService';
 import * as metrics from './metrics';
 
+// API URL'i çevre değişkenlerinden alıyoruz, varsayılan olarak canlı ortam URL'ini kullanıyoruz
 export const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com'}/api`;
 
 console.log('Environment Config:', {
@@ -31,20 +32,21 @@ apiClient.interceptors.request.use(config => {
 
 // API istek interceptor'ını güncelleyelim
 apiClient.interceptors.request.use(request => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  console.log('API Request:', {
-    url: request.url,
-    method: request.method,
-    baseURL: request.baseURL,
-    headers: request.headers,
-    environment: process.env.NODE_ENV,
-    data: request.data instanceof FormData ? 
-      'FormData Contents:' + Array.from(request.data.entries()).map(([key, value]) => 
-        `${key}: ${value instanceof File ? value.name : value}`
-      ).join(', ') 
-      : request.data
-  });
+  // Sadece geliştirme ortamında detaylı logları göster
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('API Request:', {
+      url: request.url,
+      method: request.method,
+      baseURL: request.baseURL,
+      headers: request.headers,
+      environment: process.env.NODE_ENV,
+      data: request.data instanceof FormData ? 
+        'FormData Contents:' + Array.from(request.data.entries()).map(([key, value]) => 
+          `${key}: ${value instanceof File ? value.name : value}`
+        ).join(', ') 
+        : request.data
+    });
+  }
 
   return request;
 }, error => {
@@ -167,7 +169,7 @@ export const endpoints = {
     printifySettings: '/User/printify-settings',
     printifyApiKey: '/User/printify-api-key',
     shopId: '/User/shop-id',
-    blueprints: (userId: string) => `/UserOfBlueprint/user/${userId}`,
+    blueprints: (userId: number) => `/UserOfBlueprint/user/${userId}`,
   },
   printify: {
     blueprints: {
@@ -197,8 +199,8 @@ export const endpoints = {
   },
   favorite: {
     lists: {
-      list: (userId: string) => `/Favorite/${userId}/lists`,
-      create: (userId: string) => `/Favorite/${userId}/lists`,
+      list: (userId: number) => `/Favorite/${userId}/lists`,
+      create: (userId: number) => `/Favorite/${userId}/lists`,
       delete: (listId: number) => `/Favorite/lists/${listId}`,
       mockups: {
         add: (listId: number) => `/Favorite/lists/${listId}/mockups/batch`,
@@ -213,7 +215,7 @@ export const endpoints = {
 };
 
 // Helper function to get user ID from token
-export const getCurrentUserId = (): string => {
+export const getCurrentUserId = (): number => {
   const user = authService.getCurrentUser();
   if (!user?.userId) {
     throw new Error('User ID not found');

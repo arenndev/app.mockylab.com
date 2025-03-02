@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import Image from 'next/image';
 import { authService } from "@/services/authService";
-import { API_URL } from '@/utils/apiConfig';
+import { API_URL, getCurrentUserId } from '@/utils/apiConfig';
 
 interface MockupData {
   id: number;
@@ -63,14 +63,15 @@ const MockupList = () => {
         return;
       }
 
-      const userId = authService.getCurrentUser()?.userId;
-      if (!userId) {
-        throw new Error('User ID not found');
-      }
+      const userId = getCurrentUserId();
+      console.log('Fetching mockups for user ID:', userId);
 
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      console.log('Making request to:', `${API_URL}/Mockup/user/${userId}`);
       const response = await axios.get(`${API_URL}/Mockup/user/${userId}`);
       
+      console.log('Mockups response:', response.data);
       if (response.data.success) {
         setMockups(response.data.data);
       }

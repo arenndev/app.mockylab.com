@@ -1,11 +1,11 @@
 import axios, { AxiosError } from 'axios';
 import { authService } from './authService';
+import { getCurrentUserId } from '@/utils/apiConfig';
 import {
   PrintifySettings,
   Blueprint,
   BlueprintListResponse,
   VariantResponse,
-  CreateProductRequest,
   PrintifyApiResponse,
   BlueprintVariant,
   PaginatedResponse,
@@ -14,6 +14,7 @@ import {
   BulkOperationsRequest
 } from '@/types/printify';
 
+// API URL'i çevre değişkenlerinden alıyoruz, varsayılan olarak canlı ortam URL'ini kullanıyoruz
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.mockylab.com';
 
 const ENDPOINTS = {
@@ -38,12 +39,12 @@ const ENDPOINTS = {
     upload: '/api/PrintifyImage/upload',
   },
   user: {
-    blueprints: (userId: string) => `/api/UserOfBlueprint/user/${userId}`,
+    blueprints: (userId: number) => `/api/UserOfBlueprint/user/${userId}`,
     removeBlueprint: (id: number) => `/api/UserOfBlueprint/${id}`,
     variants: {
       get: (id: number) => `/api/UserOfVariant/${id}`,
-      getByUser: (userId: string) => `/api/UserOfVariant/user/${userId}`,
-      getByBlueprint: (userId: string, blueprintId: number) => `/api/UserOfVariant/user/${userId}/blueprint/${blueprintId}`,
+      getByUser: (userId: number) => `/api/UserOfVariant/user/${userId}`,
+      getByBlueprint: (userId: number, blueprintId: number) => `/api/UserOfVariant/user/${userId}/blueprint/${blueprintId}`,
       create: '/api/UserOfVariant',
       createBulk: '/api/UserOfVariant/bulk',
       update: (id: number) => `/api/UserOfVariant/${id}`,
@@ -52,27 +53,14 @@ const ENDPOINTS = {
   },
   userVariants: {
     get: (id: number) => `/api/UserOfVariant/${id}`,
-    getByUser: (userId: string) => `/api/UserOfVariant/user/${userId}`,
-    getByBlueprint: (userId: string, blueprintId: number) => `/api/UserOfVariant/user/${userId}/blueprint/${blueprintId}`,
+    getByUser: (userId: number) => `/api/UserOfVariant/user/${userId}`,
+    getByBlueprint: (userId: number, blueprintId: number) => `/api/UserOfVariant/user/${userId}/blueprint/${blueprintId}`,
     create: '/api/UserOfVariant',
     createBulk: '/api/UserOfVariant/bulk',
     update: (id: number) => `/api/UserOfVariant/${id}`,
     delete: (id: number) => `/api/UserOfVariant/${id}`
   }
 };
-
-interface CreateProductRequest {
-    title: string;
-    description: string;
-    blueprintId: number;
-    variantImages: {
-        black: string | undefined;
-        white: string | undefined;
-        color: string | undefined;
-    };
-    tags: string[];
-    userId: number;
-}
 
 class PrintifyService {
   private shopId: string | null = null;
@@ -251,7 +239,18 @@ class PrintifyService {
   }
 
   // Products
-  async createProduct(data: CreateProductRequest): Promise<any> {
+  async createProduct(data: {
+    title: string;
+    description: string;
+    blueprintId: number;
+    variantImages: {
+        black: string | undefined;
+        white: string | undefined;
+        color: string | undefined;
+    };
+    tags: string[];
+    userId: number;
+  }): Promise<any> {
     try {
         console.log('Creating product with data:', data);
 
@@ -319,56 +318,58 @@ class PrintifyService {
   }
 
   // User Blueprints
-  async getUserBlueprints(userId: string) {
+  async getUserBlueprints(userId: number) {
     try {
-      const response = await axios.get(
-        `${API_URL}${ENDPOINTS.user.blueprints(userId)}`,
-        { headers: this.getHeaders() }
-      );
-      
+      console.log(`Fetching user blueprints for user ID: ${userId}`);
+      const response = await axios.get(`${API_URL}${ENDPOINTS.user.blueprints(userId)}`, {
+        headers: this.getHeaders(),
+      });
+
+      console.log('Raw user blueprints response:', response.data);
+
+      // Kullanıcı blueprint'lerini al
       const userBlueprints = response.data;
-      const detailedBlueprints = await Promise.all(
-        userBlueprints.map(async (userBlueprint: any) => {
-          try {
-            const blueprintDetails = await this.getBlueprintDetails(userBlueprint.blueprintId);
-            return {
-              ...userBlueprint,
-              blueprint: blueprintDetails
-            };
-          } catch (error) {
-            console.error(`Error fetching blueprint details for ID ${userBlueprint.blueprintId}:`, error);
-            return {
-              ...userBlueprint,
-              blueprint: {
-                id: userBlueprint.blueprintId,
-                title: 'Blueprint not found',
-                description: 'This blueprint may have been deleted or is temporarily unavailable.',
-                brand: 'Unknown',
-                model: 'Unknown',
-                images: []
-              }
-            };
+
+      if (!userBlueprints || userBlueprints.length === 0) {
+        console.log('No user blueprints found');
+        return [];
+      }
+
+      // Eğer blueprint detayları yoksa, her bir blueprint için detayları ayrıca getir
+      const enrichedBlueprints = await Promise.all(
+        userBlueprints.map(async (userBlueprint: { blueprintId: number; blueprint?: any }) => {
+          if (!userBlueprint.blueprint) {
+            try {
+              const blueprintDetails = await this.getBlueprintDetails(userBlueprint.blueprintId);
+              return {
+                ...userBlueprint,
+                blueprint: blueprintDetails
+              };
+            } catch (error) {
+              console.error(`Error fetching details for blueprint ${userBlueprint.blueprintId}:`, error);
+              return userBlueprint;
+            }
           }
+          return userBlueprint;
         })
       );
 
-      return detailedBlueprints;
+      console.log('Enriched blueprints:', enrichedBlueprints);
+      return enrichedBlueprints;
     } catch (error) {
-      throw this.handleError(error);
+      this.handleError(error);
     }
   }
 
-  async addBlueprintToUser(userId: string, blueprintId: number): Promise<void> {
+  async addBlueprintToUser(userId: number, blueprintId: number): Promise<void> {
     try {
-      await axios.post(
-        `${API_URL}/api/UserOfBlueprint`,
-        { 
-          userId: parseInt(userId), 
-          blueprintId 
-        },
-        { headers: this.getHeaders() }
-      );
+      await axios.post(`${API_URL}/api/UserOfBlueprint`, {
+        blueprintId,
+        userId,
+        isActive: true
+      }, { headers: this.getHeaders() });
     } catch (error) {
+      console.error('Error adding blueprint to user:', error);
       throw this.handleError(error);
     }
   }
@@ -385,10 +386,10 @@ class PrintifyService {
   }
 
   // User Variants
-  async getUserVariants(userId: string) {
+  async getUserVariants(userId: number) {
     try {
       const response = await axios.get(
-        `${API_URL}${ENDPOINTS.user.variants.getByUser(userId)}`,
+        `${API_URL}${ENDPOINTS.userVariants.getByUser(userId)}`,
         { headers: this.getHeaders() }
       );
       return response.data;
@@ -397,7 +398,7 @@ class PrintifyService {
     }
   }
 
-  async getUserVariantsByBlueprint(userId: string, blueprintId: number) {
+  async getUserVariantsByBlueprint(userId: number, blueprintId: number) {
     try {
       const response = await axios.get(
         `${API_URL}${ENDPOINTS.userVariants.getByBlueprint(userId, blueprintId)}`,

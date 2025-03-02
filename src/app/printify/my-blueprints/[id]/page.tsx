@@ -5,6 +5,7 @@ import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { printifyService } from '@/services/printifyService';
 import { authService } from '@/services/authService';
+import { getCurrentUserId } from '@/utils/apiConfig';
 import { useParams } from 'next/navigation';
 import type { Blueprint, VariantResponse } from '@/types/printify';
 import VariantManagementModal from '@/components/Modals/VariantManagementModal';
@@ -76,13 +77,11 @@ const BlueprintDetail = () => {
   const fetchUserVariants = async () => {
     setIsLoadingUserVariants(true);
     try {
-      const userId = authService.getUserId();
-      if (!userId) {
-        setError('User authentication error');
-        return;
-      }
+      const userId = getCurrentUserId();
+      console.log('Fetching variants for user ID:', userId, 'and blueprint ID:', blueprintId);
 
       const variants = await printifyService.getUserVariantsByBlueprint(userId, parseInt(blueprintId));
+      console.log('User variants response:', variants);
       setUserVariants(variants);
     } catch (err) {
       if (err instanceof Error) {

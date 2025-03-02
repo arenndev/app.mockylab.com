@@ -19,7 +19,7 @@ export interface Mockup {
 }
 
 class FavoriteService {
-  private async getUserId() {
+  private async getUserId(): Promise<number> {
     const user = authService.getCurrentUser();
     if (!user?.userId) throw new Error('User ID not found');
     return user.userId;

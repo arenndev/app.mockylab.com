@@ -35,7 +35,7 @@ const nextConfig = {
     return []
   },
   images: {
-    domains: ['images.printify.com'],
+    domains: ['images.printify.com', 'ideogram.ai'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -46,6 +46,11 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'd3l4q0oig1v782.cloudfront.net',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ideogram.ai',
+        pathname: '/api/images/**',
       }
     ]
   },

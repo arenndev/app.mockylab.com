@@ -5,6 +5,7 @@ import DefaultLayout from '@/components/Layouts/DefaultLayout';
 import Breadcrumb from '@/components/Breadcrumbs/Breadcrumb';
 import { printifyService } from '@/services/printifyService';
 import { authService } from '@/services/authService';
+import { getCurrentUserId } from '@/utils/apiConfig';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -37,13 +38,17 @@ const MyBlueprints = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const userId = authService.getUserId();
-      if (!userId) {
-        setError('User authentication error. Please login again.');
-        return;
-      }
+      const userId = getCurrentUserId();
+      console.log('Fetching blueprints for user ID:', userId);
 
       const blueprints = await printifyService.getUserBlueprints(userId);
+      console.log('User blueprints response:', blueprints);
+      
+      blueprints.forEach((blueprint, index) => {
+        console.log(`Blueprint ${index}:`, blueprint);
+        console.log(`Blueprint ${index} details:`, blueprint.blueprint);
+      });
+      
       setUserBlueprints(blueprints);
     } catch (err) {
       if (err instanceof Error) {
@@ -111,51 +116,55 @@ const MyBlueprints = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {userBlueprints.map((userBlueprint) => (
-                      <div key={userBlueprint.id} className="border rounded-lg overflow-hidden">
-                        {userBlueprint.blueprint && userBlueprint.blueprint.images && userBlueprint.blueprint.images.length > 0 ? (
-                          <img
-                            src={userBlueprint.blueprint.images[0]}
-                            alt={userBlueprint.blueprint.title}
-                            className="w-full h-48 object-cover"
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = '/images/placeholder.jpg';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                            <span className="text-gray-400">No image</span>
-                          </div>
-                        )}
-                        <div className="p-4">
-                          <h3 className="font-semibold text-lg mb-2">
-                            {userBlueprint.blueprint?.title || 'Unknown Blueprint'}
-                          </h3>
-                          <p className="text-sm text-gray-600 mb-2">
-                            Brand: {userBlueprint.blueprint?.brand || 'N/A'}
-                          </p>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Model: {userBlueprint.blueprint?.model || 'N/A'}
-                          </p>
-                          <div className="flex flex-col gap-2">
-                            <Link
-                              href={`/printify/my-blueprints/${userBlueprint.blueprintId}`}
-                              className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10"
-                            >
-                              View Details
-                            </Link>
-                            <button
-                              onClick={() => handleRemoveBlueprint(userBlueprint.id)}
-                              className="inline-flex items-center justify-center rounded-md bg-danger px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10"
-                            >
-                              Remove
-                            </button>
+                    {userBlueprints.map((userBlueprint) => {
+                      console.log('Rendering blueprint:', userBlueprint);
+                      return (
+                        <div key={userBlueprint.id} className="border rounded-lg overflow-hidden">
+                          {userBlueprint.blueprint && userBlueprint.blueprint.images && userBlueprint.blueprint.images.length > 0 ? (
+                            <img
+                              src={userBlueprint.blueprint.images[0]}
+                              alt={userBlueprint.blueprint.title}
+                              className="w-full h-48 object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = '/images/placeholder.jpg';
+                                console.log('Image load error, using placeholder');
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                              <span className="text-gray-400">No image</span>
+                            </div>
+                          )}
+                          <div className="p-4">
+                            <h3 className="font-semibold text-lg mb-2">
+                              {userBlueprint.blueprint?.title || 'Unknown Blueprint'}
+                            </h3>
+                            <p className="text-sm text-gray-600 mb-2">
+                              Brand: {userBlueprint.blueprint?.brand || 'N/A'}
+                            </p>
+                            <p className="text-sm text-gray-600 mb-4">
+                              Model: {userBlueprint.blueprint?.model || 'N/A'}
+                            </p>
+                            <div className="flex flex-col gap-2">
+                              <Link
+                                href={`/printify/my-blueprints/${userBlueprint.blueprintId}`}
+                                className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10"
+                              >
+                                View Details
+                              </Link>
+                              <button
+                                onClick={() => handleRemoveBlueprint(userBlueprint.id)}
+                                className="inline-flex items-center justify-center rounded-md bg-danger px-6 py-2.5 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10"
+                              >
+                                Remove
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
